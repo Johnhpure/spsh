@@ -696,7 +696,7 @@ onUnmounted(() => {
   border-radius: 12px;
   font-family: 'SF Mono', 'Menlo', monospace;
   font-size: 11px;
-  color: #444;
+  color: var(--color-text-main);
   max-height: 80px;
   overflow-y: auto;
   border-left: 4px solid transparent;
