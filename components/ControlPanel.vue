@@ -1,0 +1,719 @@
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, computed } from 'vue';
+
+const props = defineProps<{
+  status: string;
+  isRunning: boolean;
+  logs: string[];
+  auditState: {
+    product: { id: string; name: string; image: string } | null;
+    textRequest: string;
+    textResponse: string;
+    imageRequest: string;
+    imageResponse: string;
+    result: { label: string; type: string } | null;
+    stats: { total: number; processed: number; passed: number; rejected: number };
+  };
+  history: {
+    id: string;
+    name: string;
+    image: string;
+    status: 'passed' | 'rejected';
+    reason?: string;
+    timestamp: number;
+  }[];
+}>();
+
+defineEmits(['start', 'stop']);
+
+const isMinimized = ref(false);
+const activeTab = ref<'current' | 'passed' | 'rejected'>('current');
+
+const passedHistory = computed(() => props.history.filter(h => h.status === 'passed'));
+const rejectedHistory = computed(() => props.history.filter(h => h.status === 'rejected'));
+
+const toggleMinimize = () => {
+  isMinimized.value = !isMinimized.value;
+};
+
+const formatDate = (ts: number) => {
+  return new Date(ts).toLocaleTimeString();
+};
+
+// Draggable Logic
+const panelRef = ref<HTMLElement | null>(null);
+const position = ref({ x: window.innerWidth - 620, y: 20 }); // Initial position
+const isDragging = ref(false);
+const dragOffset = ref({ x: 0, y: 0 });
+
+const startDrag = (e: MouseEvent) => {
+  if (panelRef.value) {
+    isDragging.value = true;
+    dragOffset.value = {
+      x: e.clientX - position.value.x,
+      y: e.clientY - position.value.y
+    };
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', stopDrag);
+  }
+};
+
+const onDrag = (e: MouseEvent) => {
+  if (isDragging.value) {
+    position.value = {
+      x: e.clientX - dragOffset.value.x,
+      y: e.clientY - dragOffset.value.y
+    };
+  }
+};
+
+const stopDrag = () => {
+  isDragging.value = false;
+  document.removeEventListener('mousemove', onDrag);
+  document.removeEventListener('mouseup', stopDrag);
+};
+
+onMounted(() => {
+    // Optional: Load position from storage
+});
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', onDrag);
+  document.removeEventListener('mouseup', stopDrag);
+});
+</script>
+
+<template>
+  <div 
+    class="control-panel" 
+    :class="{ minimized: isMinimized }"
+    ref="panelRef"
+    :style="{ left: position.x + 'px', top: position.y + 'px' }"
+  >
+    <!-- Header -->
+    <div class="header" @mousedown="startDrag" v-if="!isMinimized">
+      <div class="header-title">
+        <h3>商品审核助手</h3>
+        <span class="status-dot" :class="isRunning ? 'running' : 'idle'"></span>
+      </div>
+      <div class="header-controls">
+        <button class="icon-btn minimize-btn" @click="toggleMinimize" title="最小化">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Minimized View -->
+    <div class="minimized-view" v-if="isMinimized" @mousedown="startDrag" @click="toggleMinimize">
+      <div class="minimized-icon" :class="isRunning ? 'running' : 'idle'">
+        🛡️
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content" v-show="!isMinimized">
+      <!-- Tabs -->
+      <div class="tabs-container">
+        <div class="tabs">
+          <button 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'current' }"
+            @click="activeTab = 'current'"
+          >
+            当前审核
+          </button>
+          <button 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'passed' }"
+            @click="activeTab = 'passed'"
+          >
+            通过记录 <span class="badge" v-if="passedHistory.length">{{ passedHistory.length }}</span>
+          </button>
+          <button 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'rejected' }"
+            @click="activeTab = 'rejected'"
+          >
+            拒绝记录 <span class="badge" v-if="rejectedHistory.length">{{ rejectedHistory.length }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Content: Current -->
+      <div v-show="activeTab === 'current'" class="tab-pane">
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">总数</span>
+            <span class="stat-value">{{ auditState.stats.total }}</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">已处理</span>
+            <span class="stat-value">{{ auditState.stats.processed }}</span>
+          </div>
+          <div class="stat-card success">
+            <span class="stat-label">通过</span>
+            <span class="stat-value">{{ auditState.stats.passed }}</span>
+          </div>
+          <div class="stat-card danger">
+            <span class="stat-label">拒绝</span>
+            <span class="stat-value">{{ auditState.stats.rejected }}</span>
+          </div>
+        </div>
+
+        <!-- Current Audit Card -->
+        <div class="card current-audit-card">
+          <div class="card-header">
+            <h4>当前处理商品</h4>
+            <div class="audit-result-badge" v-if="auditState.result" :class="auditState.result.type">
+              {{ auditState.result.label }}
+            </div>
+          </div>
+          
+          <div v-if="auditState.product" class="product-content">
+            <div class="product-info-row">
+              <div class="product-image-wrapper">
+                <img :src="auditState.product.image" class="product-thumb" v-if="auditState.product.image" />
+                <div v-else class="product-thumb-placeholder">No Image</div>
+              </div>
+              <div class="product-details">
+                <div class="product-id">ID: {{ auditState.product.id }}</div>
+                <div class="product-name">{{ auditState.product.name }}</div>
+              </div>
+            </div>
+
+            <div class="audit-details-grid">
+                <div class="detail-block">
+                    <h5>文本审核</h5>
+                    <div class="code-group">
+                      <div class="code-label">Request</div>
+                      <div class="code-box request">{{ auditState.textRequest }}</div>
+                    </div>
+                    <div class="code-group">
+                      <div class="code-label">Response</div>
+                      <div class="code-box response">{{ auditState.textResponse }}</div>
+                    </div>
+                </div>
+                <div class="detail-block">
+                    <h5>图片审核</h5>
+                    <div class="code-group">
+                      <div class="code-label">Request</div>
+                      <div class="code-box request">{{ auditState.imageRequest }}</div>
+                    </div>
+                    <div class="code-group">
+                      <div class="code-label">Response</div>
+                      <div class="code-box response">{{ auditState.imageResponse }}</div>
+                    </div>
+                </div>
+            </div>
+          </div>
+          <div v-else class="empty-state">
+            <div class="empty-icon">⏳</div>
+            <p>等待开始或获取数据...</p>
+          </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="logs-section">
+          <div class="logs-container" ref="logsContainer">
+            <div v-for="(log, index) in logs.slice().reverse()" :key="index" class="log-entry">
+              <span class="log-time">{{ new Date().toLocaleTimeString() }}</span>
+              <span class="log-text">{{ log }}</span>
+            </div>
+          </div>
+        </div>
+
+
+      </div>
+
+      <!-- Tab Content: History -->
+      <div v-show="activeTab === 'passed'" class="tab-pane history-view">
+        <div v-if="passedHistory.length === 0" class="empty-history">
+          <div class="empty-icon">📂</div>
+          <p>暂无通过记录</p>
+        </div>
+        <div v-else class="history-list">
+          <div v-for="item in passedHistory" :key="item.timestamp" class="history-card passed">
+            <div class="history-main">
+              <div class="history-id-badge">#{{ item.id }}</div>
+              <div class="history-name">{{ item.name }}</div>
+            </div>
+            <div class="history-meta">
+              <span class="history-time">{{ formatDate(item.timestamp) }}</span>
+              <span class="status-pill passed">通过</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-show="activeTab === 'rejected'" class="tab-pane history-view">
+        <div v-if="rejectedHistory.length === 0" class="empty-history">
+          <div class="empty-icon">📂</div>
+          <p>暂无拒绝记录</p>
+        </div>
+        <div v-else class="history-list">
+          <div v-for="item in rejectedHistory" :key="item.timestamp" class="history-card rejected">
+             <div class="history-main">
+              <div class="history-id-badge">#{{ item.id }}</div>
+              <div class="history-name">{{ item.name }}</div>
+            </div>
+            <div class="history-reason-box" v-if="item.reason">
+              {{ item.reason }}
+            </div>
+            <div class="history-meta">
+              <span class="history-time">{{ formatDate(item.timestamp) }}</span>
+              <span class="status-pill rejected">拒绝</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions (Fixed at bottom) -->
+    <div class="actions-bar" v-show="!isMinimized && activeTab === 'current'">
+      <button 
+        class="action-btn primary" 
+        @click="$emit('start')" 
+        :disabled="isRunning"
+      >
+        <span class="btn-icon">▶</span> 开始自动审核
+      </button>
+      <button 
+        class="action-btn danger" 
+        @click="$emit('stop')" 
+        :disabled="!isRunning"
+      >
+        <span class="btn-icon">⏹</span> 停止
+      </button>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+/* OneUI 8.0 Inspired Variables */
+.control-panel {
+  --ui-bg: #f8f9fa; /* Light background */
+  --ui-bg-blur: 30px;
+  --ui-shadow: 0 20px 50px rgba(0, 0, 0, 0.2), 0 10px 20px rgba(0, 0, 0, 0.1);
+  --ui-border-radius: 26px;
+  --ui-card-radius: 20px;
+  --ui-btn-radius: 50px;
+  
+  --color-primary: #007AFF;
+  --color-success: #34C759;
+  --color-danger: #FF3B30;
+  --color-text-main: #1C1C1E;
+  --color-text-sub: #8E8E93;
+  --color-bg-secondary: #F2F2F7;
+  
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Main Container */
+.control-panel {
+  position: fixed;
+  background: var(--ui-bg);
+  backdrop-filter: blur(var(--ui-bg-blur));
+  -webkit-backdrop-filter: blur(var(--ui-bg-blur));
+  border-radius: var(--ui-border-radius);
+  box-shadow: var(--ui-shadow);
+  z-index: 99999;
+  font-family: var(--font-family);
+  display: flex;
+  flex-direction: column;
+  /* height: 750px; Removed fixed height */
+  height: auto;
+  max-height: 90vh;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  color: var(--color-text-main);
+}
+
+/* Breathing Border Effect */
+.control-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: var(--ui-border-radius);
+  padding: 2px;
+  background: linear-gradient(45deg, #007AFF, #34C759, #FF3B30, #007AFF);
+  background-size: 400% 400%;
+  -webkit-mask: 
+     linear-gradient(#fff 0 0) content-box, 
+     linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: breathe 8s ease infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes breathe {
+  0% { background-position: 0% 50%; opacity: 0.5; }
+  50% { background-position: 100% 50%; opacity: 1; }
+  100% { background-position: 0% 50%; opacity: 0.5; }
+}
+
+.control-panel:not(.minimized) {
+  width: 500px;
+}
+
+.control-panel.minimized {
+  width: 60px;
+  height: 60px;
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.control-panel.minimized::before {
+    border-radius: 30px;
+}
+
+/* Header */
+.header {
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: move;
+  user-select: none;
+  background: transparent;
+  position: relative;
+  z-index: 2;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-sub);
+  transition: background 0.3s;
+}
+.status-dot.running { background: var(--color-success); box-shadow: 0 0 8px var(--color-success); }
+
+.icon-btn {
+  background: rgba(0,0,0,0.05);
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-text-main);
+  transition: all 0.2s;
+}
+.icon-btn:hover { background: rgba(0,0,0,0.1); transform: scale(1.05); }
+
+/* Minimized View */
+.minimized-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+}
+.minimized-icon { font-size: 28px; }
+.minimized-icon.running { animation: pulse 2s infinite; }
+
+/* Content Area */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 20px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+/* Scrollbar Styling */
+.content::-webkit-scrollbar { width: 6px; }
+.content::-webkit-scrollbar-track { background: transparent; }
+.content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 3px; }
+
+/* Tabs */
+.tabs-container {
+  position: sticky;
+  top: 0;
+  background: transparent;
+  padding-bottom: 10px;
+  z-index: 10;
+}
+
+.tabs {
+  display: flex;
+  background: rgba(118, 118, 128, 0.12);
+  padding: 4px;
+  border-radius: 16px;
+}
+
+.tab-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-sub);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tab-btn.active {
+  background: #fff;
+  color: var(--color-text-main);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.badge {
+  background: var(--color-text-sub);
+  color: white;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  min-width: 14px;
+  text-align: center;
+}
+.tab-btn.active .badge { background: var(--color-primary); }
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.stat-card {
+  background: #fff;
+  padding: 10px;
+  border-radius: var(--ui-card-radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+  transition: transform 0.2s;
+  animation: card-breathe 4s ease-in-out infinite; /* Breathing effect */
+}
+.stat-card:hover { transform: translateY(-2px); }
+
+.stat-label { font-size: 12px; color: var(--color-text-sub); margin-bottom: 2px; }
+.stat-value { font-size: 20px; font-weight: 700; color: var(--color-text-main); }
+.stat-card.success .stat-value { color: var(--color-success); }
+.stat-card.danger .stat-value { color: var(--color-danger); }
+
+/* Cards */
+.card {
+  background: #fff;
+  border-radius: var(--ui-card-radius);
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+  animation: card-breathe 4s ease-in-out infinite; /* Breathing effect */
+}
+
+@keyframes card-breathe {
+  0% { background-color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
+  50% { background-color: #fcfcfc; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+  100% { background-color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
+}
+
+.current-audit-card {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.card-header h4 { margin: 0; font-size: 16px; font-weight: 600; }
+
+.audit-result-badge {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.audit-result-badge.success { background: var(--color-success-soft); color: var(--color-success); }
+.audit-result-badge.danger { background: var(--color-danger-soft); color: var(--color-danger); }
+
+/* Product Info */
+.product-info-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.product-image-wrapper {
+  width: 70px;
+  height: 70px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+.product-thumb { width: 100%; height: 100%; object-fit: cover; }
+.product-thumb-placeholder {
+  width: 100%; height: 100%; background: var(--color-bg-secondary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--color-text-sub);
+}
+
+.product-details { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.product-id { font-size: 12px; color: var(--color-text-sub); margin-bottom: 4px; font-family: monospace; }
+.product-name { font-size: 15px; font-weight: 600; line-height: 1.4; }
+
+/* Code/Details */
+.audit-details-grid { display: flex; flex-direction: column; gap: 16px; }
+.detail-block h5 { margin: 0 0 8px 0; font-size: 12px; color: var(--color-text-sub); text-transform: uppercase; letter-spacing: 0.5px; }
+
+.code-group { margin-bottom: 8px; }
+.code-label { font-size: 10px; color: var(--color-text-sub); margin-bottom: 2px; font-weight: 600; }
+.code-box {
+  background: var(--color-bg-secondary);
+  padding: 10px;
+  border-radius: 12px;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 11px;
+  color: #444;
+  max-height: 80px;
+  overflow-y: auto;
+  border-left: 4px solid transparent;
+}
+.code-box.request { border-left-color: var(--color-primary); }
+.code-box.response { border-left-color: var(--color-success); }
+
+/* Logs */
+.logs-section {
+  background: var(--color-bg-secondary);
+  border-radius: var(--ui-card-radius);
+  padding: 12px;
+  height: 80px;
+  overflow: hidden;
+}
+.logs-container {
+  height: 100%;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 11px;
+}
+.log-entry { margin-bottom: 4px; display: flex; gap: 8px; }
+.log-time { color: var(--color-text-sub); flex-shrink: 0; }
+.log-text { color: var(--color-text-main); word-break: break-all; }
+
+/* Actions */
+.actions-bar { 
+  display: flex; 
+  gap: 12px; 
+  margin-top: auto; 
+  padding: 20px; /* Added padding */
+  background: transparent; /* Or match bg if needed */
+  z-index: 2;
+}.action-btn {
+  flex: 1;
+  border: none;
+  padding: 14px;
+  border-radius: var(--ui-btn-radius);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.action-btn:active { transform: scale(0.96); }
+.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.action-btn.primary { background: var(--color-primary); color: white; box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3); }
+.action-btn.danger { background: var(--color-danger); color: white; box-shadow: 0 4px 12px rgba(255, 59, 48, 0.3); }
+
+/* History List */
+.history-view { padding-bottom: 10px; height: 100%; /* Fill available space */ }
+.history-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  transition: transform 0.2s;
+  animation: card-breathe 4s ease-in-out infinite; /* Breathing effect */
+}
+.history-card:hover { transform: scale(1.01); }
+
+.history-main { margin-bottom: 10px; }
+.history-id-badge {
+  display: inline-block;
+  background: var(--color-bg-secondary);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  color: var(--color-text-sub);
+  margin-bottom: 4px;
+  font-family: monospace;
+}
+.history-name { font-size: 14px; font-weight: 600; color: var(--color-text-main); }
+
+.history-reason-box {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: 12px;
+  padding: 8px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.history-meta { display: flex; justify-content: space-between; align-items: center; }
+.history-time { font-size: 11px; color: var(--color-text-sub); }
+
+.status-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+.status-pill.passed { background: var(--color-success-soft); color: var(--color-success); }
+.status-pill.rejected { background: var(--color-danger-soft); color: var(--color-danger); }
+
+.empty-state, .empty-history {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--color-text-sub);
+}
+.empty-icon { font-size: 40px; margin-bottom: 10px; opacity: 0.5; }
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+</style>
