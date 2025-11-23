@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { storage } from 'wxt/storage';
 
 const props = defineProps<{
   status: string;
@@ -28,12 +29,46 @@ defineEmits(['start', 'stop']);
 
 const isMinimized = ref(false);
 const activeTab = ref<'current' | 'passed' | 'rejected'>('current');
+const showSettings = ref(false);
+const isDarkMode = ref(false);
+const settingsForm = ref({
+  accessKeyId: '',
+  accessKeySecret: ''
+});
+
+const openSettings = async () => {
+  const stored = await storage.getItem<{ accessKeyId: string; accessKeySecret: string }>('local:aliyun_config');
+  if (stored) {
+    settingsForm.value = { ...stored };
+  } else {
+      // Load default from env if available (optional, but good for UX)
+      settingsForm.value = {
+          accessKeyId: import.meta.env.WXT_ALIYUN_ACCESS_KEY_ID || '',
+          accessKeySecret: import.meta.env.WXT_ALIYUN_ACCESS_KEY_SECRET || ''
+      };
+  }
+  showSettings.value = true;
+};
+
+const saveSettings = async () => {
+  await storage.setItem('local:aliyun_config', settingsForm.value);
+  showSettings.value = false;
+};
+
+const closeSettings = () => {
+  showSettings.value = false;
+};
 
 const passedHistory = computed(() => props.history.filter(h => h.status === 'passed'));
 const rejectedHistory = computed(() => props.history.filter(h => h.status === 'rejected'));
 
 const toggleMinimize = () => {
   isMinimized.value = !isMinimized.value;
+};
+
+const toggleTheme = async () => {
+    isDarkMode.value = !isDarkMode.value;
+    await storage.setItem('local:dark_mode', isDarkMode.value);
 };
 
 const formatDate = (ts: number) => {
@@ -73,8 +108,12 @@ const stopDrag = () => {
   document.removeEventListener('mouseup', stopDrag);
 };
 
-onMounted(() => {
+onMounted(async () => {
     // Optional: Load position from storage
+    const storedDarkMode = await storage.getItem<boolean>('local:dark_mode');
+    if (storedDarkMode !== null) {
+        isDarkMode.value = storedDarkMode;
+    }
 });
 
 onUnmounted(() => {
@@ -86,7 +125,7 @@ onUnmounted(() => {
 <template>
   <div 
     class="control-panel" 
-    :class="{ minimized: isMinimized }"
+    :class="{ minimized: isMinimized, 'dark-mode': isDarkMode }"
     ref="panelRef"
     :style="{ left: position.x + 'px', top: position.y + 'px' }"
   >
@@ -97,6 +136,16 @@ onUnmounted(() => {
         <span class="status-dot" :class="isRunning ? 'running' : 'idle'"></span>
       </div>
       <div class="header-controls">
+        <button class="icon-btn theme-btn" @click="toggleTheme" :title="isDarkMode ? '切换亮色' : '切换暗色'">
+          <span v-if="isDarkMode">☀️</span>
+          <span v-else>🌙</span>
+        </button>
+        <button class="icon-btn settings-btn" @click="openSettings" title="设置">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
         <button class="icon-btn minimize-btn" @click="toggleMinimize" title="最小化">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -271,6 +320,25 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- Settings Overlay -->
+    <div class="settings-overlay" v-if="showSettings">
+      <div class="settings-content">
+        <h4>阿里云配置</h4>
+        <div class="form-group">
+          <label>AccessKey ID</label>
+          <input type="text" v-model="settingsForm.accessKeyId" placeholder="LTAI..." />
+        </div>
+        <div class="form-group">
+          <label>AccessKey Secret</label>
+          <input type="password" v-model="settingsForm.accessKeySecret" placeholder="Secret..." />
+        </div>
+        <div class="settings-actions">
+          <button class="action-btn secondary" @click="closeSettings">取消</button>
+          <button class="action-btn primary" @click="saveSettings">保存配置</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Actions (Fixed at bottom) -->
     <div class="actions-bar" v-show="!isMinimized && activeTab === 'current'">
       <button 
@@ -293,6 +361,7 @@ onUnmounted(() => {
 
 <style scoped>
 /* OneUI 8.0 Inspired Variables */
+/* OneUI 8.0 Inspired Variables */
 .control-panel {
   --ui-bg: #f8f9fa; /* Light background */
   --ui-bg-blur: 30px;
@@ -307,8 +376,20 @@ onUnmounted(() => {
   --color-text-main: #1C1C1E;
   --color-text-sub: #8E8E93;
   --color-bg-secondary: #F2F2F7;
+  --color-card-bg: #ffffff;
+  --color-border: #e5e5ea;
   
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.control-panel.dark-mode {
+  --ui-bg: #1C1C1E; /* Dark background */
+  --color-text-main: #FFFFFF;
+  --color-text-sub: #8E8E93;
+  --color-bg-secondary: #2C2C2E;
+  --color-card-bg: #2C2C2E;
+  --color-border: #3A3A3C;
+  --ui-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 10px 20px rgba(0, 0, 0, 0.3);
 }
 
 /* Main Container */
@@ -368,6 +449,10 @@ onUnmounted(() => {
   cursor: pointer;
   box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 }
+.control-panel.dark-mode.minimized {
+    background: rgba(28, 28, 30, 0.95);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
 .control-panel.minimized::before {
     border-radius: 30px;
 }
@@ -388,6 +473,11 @@ onUnmounted(() => {
 .header-title {
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.header-controls {
+  display: flex;
   gap: 8px;
 }
 
@@ -419,6 +509,9 @@ onUnmounted(() => {
   cursor: pointer;
   color: var(--color-text-main);
   transition: all 0.2s;
+}
+.control-panel.dark-mode .icon-btn {
+    background: rgba(255,255,255,0.1);
 }
 .icon-btn:hover { background: rgba(0,0,0,0.1); transform: scale(1.05); }
 
@@ -486,7 +579,7 @@ onUnmounted(() => {
 }
 
 .tab-btn.active {
-  background: #fff;
+  background: var(--color-card-bg);
   color: var(--color-text-main);
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
@@ -510,7 +603,7 @@ onUnmounted(() => {
 }
 
 .stat-card {
-  background: #fff;
+  background: var(--color-card-bg);
   padding: 10px;
   border-radius: var(--ui-card-radius);
   display: flex;
@@ -529,7 +622,7 @@ onUnmounted(() => {
 
 /* Cards */
 .card {
-  background: #fff;
+  background: var(--color-card-bg);
   border-radius: var(--ui-card-radius);
   padding: 20px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.04);
@@ -537,9 +630,9 @@ onUnmounted(() => {
 }
 
 @keyframes card-breathe {
-  0% { background-color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
-  50% { background-color: #fcfcfc; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
-  100% { background-color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
+  0% { background-color: var(--color-card-bg); box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
+  50% { background-color: var(--color-card-bg); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+  100% { background-color: var(--color-card-bg); box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
 }
 
 .current-audit-card {
@@ -660,7 +753,7 @@ onUnmounted(() => {
 /* History List */
 .history-view { padding-bottom: 10px; height: 100%; /* Fill available space */ }
 .history-card {
-  background: #fff;
+  background: var(--color-card-bg);
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 12px;
@@ -715,5 +808,79 @@ onUnmounted(() => {
   0% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.1); opacity: 0.8; }
   100% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Settings Overlay */
+.settings-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  border-radius: var(--ui-border-radius);
+}
+
+.settings-content {
+  background: var(--color-card-bg);
+  padding: 24px;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 320px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+  color: var(--color-text-main);
+}
+
+.settings-content h4 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-sub);
+  margin-bottom: 6px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-main);
+}
+
+.form-group input:focus {
+  border-color: var(--color-primary);
+  background: var(--color-card-bg);
+}
+
+.settings-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.action-btn.secondary {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-main);
+  box-shadow: none;
 }
 </style>
