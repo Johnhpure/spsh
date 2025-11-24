@@ -12,6 +12,9 @@ const props = defineProps<{
     textResponse: string;
     imageRequest: string;
     imageResponse: string;
+    scopeRequest: string;
+    scopeResponse: string;
+    aiAnalysis: string;
     result: { label: string; type: string } | null;
     stats: { total: number; processed: number; passed: number; rejected: number };
   };
@@ -33,25 +36,30 @@ const showSettings = ref(false);
 const isDarkMode = ref(false);
 const settingsForm = ref({
   accessKeyId: '',
-  accessKeySecret: ''
+  accessKeySecret: '',
+  deepseekApiKey: ''
 });
 
 const openSettings = async () => {
-  const stored = await storage.getItem<{ accessKeyId: string; accessKeySecret: string }>('local:aliyun_config');
-  if (stored) {
-    settingsForm.value = { ...stored };
-  } else {
-      // Load default from env if available (optional, but good for UX)
-      settingsForm.value = {
-          accessKeyId: import.meta.env.WXT_ALIYUN_ACCESS_KEY_ID || '',
-          accessKeySecret: import.meta.env.WXT_ALIYUN_ACCESS_KEY_SECRET || ''
-      };
-  }
+  const aliyunStored = await storage.getItem<{ accessKeyId: string; accessKeySecret: string }>('local:aliyun_config');
+  const deepseekStored = await storage.getItem<{ deepseekApiKey: string }>('local:deepseek_config');
+  
+  settingsForm.value = {
+    accessKeyId: aliyunStored?.accessKeyId || import.meta.env.WXT_ALIYUN_ACCESS_KEY_ID || '',
+    accessKeySecret: aliyunStored?.accessKeySecret || import.meta.env.WXT_ALIYUN_ACCESS_KEY_SECRET || '',
+    deepseekApiKey: deepseekStored?.deepseekApiKey || ''
+  };
   showSettings.value = true;
 };
 
 const saveSettings = async () => {
-  await storage.setItem('local:aliyun_config', settingsForm.value);
+  await storage.setItem('local:aliyun_config', {
+    accessKeyId: settingsForm.value.accessKeyId.trim(),
+    accessKeySecret: settingsForm.value.accessKeySecret.trim()
+  });
+  await storage.setItem('local:deepseek_config', {
+    deepseekApiKey: settingsForm.value.deepseekApiKey.trim()
+  });
   showSettings.value = false;
 };
 
@@ -256,6 +264,17 @@ onUnmounted(() => {
                       <div class="code-box response">{{ auditState.imageResponse }}</div>
                     </div>
                 </div>
+                <div class="detail-block">
+                    <h5>经营范围审核</h5>
+                    <div class="code-group">
+                      <div class="code-label">OCR Result</div>
+                      <div class="code-box request">{{ auditState.scopeResponse }}</div>
+                    </div>
+                    <div class="code-group">
+                      <div class="code-label">AI Analysis</div>
+                      <div class="code-box response">{{ auditState.aiAnalysis }}</div>
+                    </div>
+                </div>
             </div>
           </div>
           <div v-else class="empty-state">
@@ -332,6 +351,13 @@ onUnmounted(() => {
           <label>AccessKey Secret</label>
           <input type="password" v-model="settingsForm.accessKeySecret" placeholder="Secret..." />
         </div>
+        
+        <h4 style="margin-top: 20px;">DeepSeek 配置</h4>
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" v-model="settingsForm.deepseekApiKey" placeholder="sk-..." />
+        </div>
+
         <div class="settings-actions">
           <button class="action-btn secondary" @click="closeSettings">取消</button>
           <button class="action-btn primary" @click="saveSettings">保存配置</button>

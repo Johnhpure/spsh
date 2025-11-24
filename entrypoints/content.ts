@@ -4,7 +4,10 @@ import { createShadowRootUi } from 'wxt/client';
 import { createApp, ref, reactive, h } from 'vue';
 import ControlPanel from '@/components/ControlPanel.vue';
 import { aliyunGreen } from '@/utils/aliyun_green';
+import { aliyunOcr } from '@/utils/aliyun_ocr';
+import { deepseek } from '@/utils/deepseek';
 import { getLabelDescription } from '@/utils/aliyun_labels';
+import './overlay.css';
 
 export default defineContentScript({
   matches: ['https://admin.pinhaopin.com/*'],
@@ -35,6 +38,9 @@ function createUi(ctx: any) {
         textResponse: '',
         imageRequest: '',
         imageResponse: '',
+        scopeRequest: '',
+        scopeResponse: '',
+        aiAnalysis: '',
         result: null as { label: string; type: 'success' | 'danger' | 'warning' | 'info' } | null,
         stats: {
           total: 0,
@@ -120,6 +126,9 @@ function createUi(ctx: any) {
               auditState.textResponse = '';
               auditState.imageRequest = '';
               auditState.imageResponse = '';
+              auditState.scopeRequest = '';
+              auditState.scopeResponse = '';
+              auditState.aiAnalysis = '';
               auditState.result = null;
 
               // Wait 10 minutes (600 seconds)
@@ -144,7 +153,7 @@ function createUi(ctx: any) {
             for (const product of products) {
               if (!isRunning.value) break;
 
-              const { id, name, description, mainImage } = product;
+              let { id, name, description, mainImage, categoryName, shopId } = product;
 
               // Check if already rejected in history
               const isAlreadyRejected = history.some(h => h.id === String(id) && h.status === 'rejected');
@@ -204,6 +213,9 @@ function createUi(ctx: any) {
               auditState.textResponse = '';
               auditState.imageRequest = ''; // Will show current processing image
               auditState.imageResponse = '';
+              auditState.scopeRequest = '';
+              auditState.scopeResponse = '';
+              auditState.aiAnalysis = '';
               auditState.result = null;
 
               log(`正在处理 ID: ${id}, 图片数: ${uniqueImages.length}...`);
@@ -257,6 +269,76 @@ function createUi(ctx: any) {
                   }
                 }
               }
+              // 3. Business Scope Audit
+              if (!isRejected) {
+                log(`ID ${id}: 开始经营范围审核...`);
+                if (!categoryName) {
+                  log(`ID ${id}: 缺少商品分类信息，跳过经营范围审核`);
+                }
+
+                if (!shopId) {
+                  // Try to scrape Shop ID from DOM
+                  // User says: <td class="ant-table-cell" style="text-align: center;">1145</td>
+                  // Heuristic: Find a cell with a number that is NOT the product ID and NOT a price/stock (hard to tell)
+                  // Let's try to find all numeric cells
+                  const cells = Array.from(row.querySelectorAll('td'));
+                  const numericCells = cells.map(c => c.textContent?.trim()).filter(t => t && /^\d+$/.test(t));
+
+                  // Usually Product ID is one, Shop ID is another.
+                  // If we find a number that is NOT the product ID, we assume it's the Shop ID.
+                  // This is risky but the best we can do without column index.
+                  // Let's assume Shop ID is usually smaller or appears after/before?
+                  // Let's just take the first number that is not the ID.
+                  const found = numericCells.find(n => n !== String(id));
+                  if (found) {
+                    shopId = found;
+                    log(`ID ${id}: 从DOM抓取到店铺ID: ${shopId}`);
+                  } else {
+                    log(`ID ${id}: 无法从DOM获取店铺ID`);
+                  }
+                }
+
+                if (!shopId) {
+                  log(`ID ${id}: 缺少店铺ID信息，跳过经营范围审核`);
+                } else {
+                  // Fetch Shop Details
+                  try {
+                    const shopRes = await fetch(`https://admin.pinhaopin.com/gateway/mall/getAdminShopDetail?shopId=${shopId}`);
+                    const shopData = await shopRes.json();
+                    const licensePic = shopData.data?.licensePic;
+
+                    if (licensePic) {
+                      log(`ID ${id}: 获取到营业执照，开始OCR识别...`);
+                      auditState.scopeRequest = `License: ${licensePic}`;
+
+                      const ocrResult = await aliyunOcr.recognizeBusinessLicense(licensePic);
+                      auditState.scopeResponse = JSON.stringify(ocrResult, null, 2);
+
+                      if (ocrResult.success && ocrResult.businessScope) {
+                        log(`ID ${id}: OCR成功，开始AI分析...`);
+                        const aiResult = await deepseek.analyzeBusinessScope(categoryName, ocrResult.businessScope);
+                        auditState.aiAnalysis = JSON.stringify(aiResult, null, 2);
+
+                        if (!aiResult.success) {
+                          isRejected = true;
+                          rejectReason = `经营范围不符: ${aiResult.reason}`;
+                          auditState.result = { label: `拒绝 (${rejectReason})`, type: 'danger' };
+                          log(`ID ${id}: 经营范围不符 (${aiResult.reason}) -> 拒绝`);
+                        }
+                      } else {
+                        log(`ID ${id}: 营业执照识别失败: ${ocrResult.error}`);
+                        auditState.result = { label: '需人工审核 (OCR失败)', type: 'warning' };
+                        stopAudit();
+                        return; // Stop processing this item
+                      }
+                    } else {
+                      log(`ID ${id}: 未找到店铺营业执照`);
+                    }
+                  } catch (e) {
+                    log(`ID ${id}: 获取店铺详情失败: ${e}`);
+                  }
+                }
+              }
 
               if (isRejected) {
                 auditState.stats.rejected++;
@@ -289,7 +371,7 @@ function createUi(ctx: any) {
               processedCount++;
               auditState.stats.processed++;
 
-              await new Promise(r => setTimeout(r, 10000)); // Wait 10s between items
+              await new Promise(r => setTimeout(r, 1000)); // Wait 1s between items
             }
 
             if (processedCount === 0) {

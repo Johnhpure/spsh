@@ -33,7 +33,11 @@ export class AliyunGreenClient {
     private async getCredentials(): Promise<AliyunConfig> {
         const stored = await storage.getItem<AliyunConfig>('local:aliyun_config');
         if (stored && stored.accessKeyId && stored.accessKeySecret) {
-            return { ...this.config, ...stored };
+            return {
+                ...this.config,
+                accessKeyId: stored.accessKeyId.trim(),
+                accessKeySecret: stored.accessKeySecret.trim()
+            };
         }
         return this.config;
     }
@@ -107,8 +111,9 @@ export class AliyunGreenClient {
             });
 
             if (!response.ok) {
-                console.error('Aliyun API Error:', response.statusText);
-                return { isSafe: false, response: { error: response.statusText } };
+                const errorText = await response.text();
+                console.error('Aliyun API Error:', response.statusText, errorText);
+                return { isSafe: false, response: { error: response.statusText, details: errorText } };
             }
 
             const data = await response.json();
