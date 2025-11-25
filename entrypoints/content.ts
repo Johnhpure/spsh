@@ -95,7 +95,7 @@ function createUi(ctx: any) {
 
       const fetchPendingProducts = async () => {
         try {
-          const res = await fetch('https://admin.pinhaopin.com/gateway/mall/listAllProducts?pageNumber=0&pageSize=20&status=pending');
+          const res = await fetch('https://admin.pinhaopin.com/gateway/mall/listAllProducts?pageNumber=0&pageSize=200&status=pending&sortField=pendingTime&sortOrder=asc');
           const data = await res.json();
           return data.data?.content || [];
         } catch (e) {
