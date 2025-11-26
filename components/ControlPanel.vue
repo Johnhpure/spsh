@@ -37,17 +37,22 @@ const isDarkMode = ref(false);
 const settingsForm = ref({
   accessKeyId: '',
   accessKeySecret: '',
-  deepseekApiKey: ''
+  deepseekApiKey: '',
+  auditApiUrl: '',
+  auditApiKey: ''
 });
 
 const openSettings = async () => {
   const aliyunStored = await storage.getItem<{ accessKeyId: string; accessKeySecret: string }>('local:aliyun_config');
   const deepseekStored = await storage.getItem<{ deepseekApiKey: string }>('local:deepseek_config');
+  const auditApiStored = await storage.getItem<{ apiUrl: string; apiKey: string }>('local:audit_api_config');
   
   settingsForm.value = {
     accessKeyId: aliyunStored?.accessKeyId || import.meta.env.WXT_ALIYUN_ACCESS_KEY_ID || '',
     accessKeySecret: aliyunStored?.accessKeySecret || import.meta.env.WXT_ALIYUN_ACCESS_KEY_SECRET || '',
-    deepseekApiKey: deepseekStored?.deepseekApiKey || ''
+    deepseekApiKey: deepseekStored?.deepseekApiKey || '',
+    auditApiUrl: auditApiStored?.apiUrl || import.meta.env.VITE_API_URL || '',
+    auditApiKey: auditApiStored?.apiKey || import.meta.env.VITE_API_KEY || ''
   };
   showSettings.value = true;
 };
@@ -59,6 +64,10 @@ const saveSettings = async () => {
   });
   await storage.setItem('local:deepseek_config', {
     deepseekApiKey: settingsForm.value.deepseekApiKey.trim()
+  });
+  await storage.setItem('local:audit_api_config', {
+    apiUrl: settingsForm.value.auditApiUrl.trim(),
+    apiKey: settingsForm.value.auditApiKey.trim()
   });
   showSettings.value = false;
 };
@@ -356,6 +365,16 @@ onUnmounted(() => {
         <div class="form-group">
           <label>API Key</label>
           <input type="password" v-model="settingsForm.deepseekApiKey" placeholder="sk-..." />
+        </div>
+
+        <h4 style="margin-top: 20px;">审核后端 API 配置</h4>
+        <div class="form-group">
+          <label>API URL</label>
+          <input type="text" v-model="settingsForm.auditApiUrl" placeholder="http://localhost:3000" />
+        </div>
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" v-model="settingsForm.auditApiKey" placeholder="your-api-key" />
         </div>
 
         <div class="settings-actions">

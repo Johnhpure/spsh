@@ -7,6 +7,7 @@ import { aliyunGreen } from '@/utils/aliyun_green';
 import { aliyunOcr } from '@/utils/aliyun_ocr';
 import { deepseek } from '@/utils/deepseek';
 import { getLabelDescription } from '@/utils/aliyun_labels';
+import { auditApi } from '@/utils/auditApi';
 import './overlay.css';
 
 export default defineContentScript({
@@ -220,12 +221,17 @@ function createUi(ctx: any) {
 
               log(`正在处理 ID: ${id}, 图片数: ${uniqueImages.length}...`);
 
+              // Track timing for API submission
+              const auditStartTime = Date.now();
+
               // Audit Content
               const contentToAudit = '商品名称：' + name + '\n商品描述：' + description;
               auditState.textRequest = contentToAudit;
 
               let isRejected = false;
               let rejectReason = '';
+              let auditStage: 'text' | 'image' | 'business_scope' = 'text';
+              let apiError: string | undefined;
 
               // 1. Text Moderation
               const textResult = await aliyunGreen.textModeration(contentToAudit);
@@ -234,6 +240,7 @@ function createUi(ctx: any) {
               if (!textResult.isSafe) {
                 isRejected = true;
                 rejectReason = '文本违规';
+                auditStage = 'text';
                 auditState.result = { label: '拒绝 (文本违规)', type: 'danger' };
                 log('ID ' + id + ': 结果 拒绝 (阿里云 - 文本违规) -> 跳过处理');
               } else {
@@ -248,6 +255,7 @@ function createUi(ctx: any) {
 
                     if (!imageResult.isSafe) {
                       isRejected = true;
+                      auditStage = 'image';
 
                       let specificReason = '图片违规';
                       if (imageResult.response && imageResult.response.Data && imageResult.response.Data.Result) {
@@ -321,6 +329,7 @@ function createUi(ctx: any) {
 
                         if (!aiResult.success) {
                           isRejected = true;
+                          auditStage = 'business_scope';
                           rejectReason = `经营范围不符: ${aiResult.reason}`;
                           auditState.result = { label: `拒绝 (${rejectReason})`, type: 'danger' };
                           log(`ID ${id}: 经营范围不符 (${aiResult.reason}) -> 拒绝`);
@@ -351,6 +360,40 @@ function createUi(ctx: any) {
                   timestamp: Date.now()
                 });
                 saveHistory();
+
+                // Send audit record to backend API
+                const auditEndTime = Date.now();
+                const aiProcessingTime = auditEndTime - auditStartTime;
+
+                try {
+                  log(`ID ${id}: 正在发送审核记录到后端...`);
+                  const apiResult = await auditApi.createRecord({
+                    productId: String(id),
+                    productTitle: name,
+                    productImage: mainImage || '',
+                    submitTime: new Date(),
+                    aiProcessingTime: aiProcessingTime,
+                    rejectionReason: rejectReason,
+                    auditStage: auditStage,
+                    apiError: apiError,
+                    textRequest: auditState.textRequest,
+                    textResponse: auditState.textResponse,
+                    imageRequest: auditState.imageRequest,
+                    imageResponse: auditState.imageResponse,
+                    scopeRequest: auditState.scopeRequest,
+                    scopeResponse: auditState.scopeResponse
+                  });
+
+                  if (apiResult.success) {
+                    log(`ID ${id}: 审核记录已成功发送到后端`);
+                  } else {
+                    log(`ID ${id}: 发送审核记录失败: ${apiResult.error}`);
+                  }
+                } catch (error) {
+                  // Catch any unexpected errors and log them without stopping the audit process
+                  console.error(`[Audit] Failed to send record for ID ${id}:`, error);
+                  log(`ID ${id}: 发送审核记录时发生异常: ${error}`);
+                }
               } else {
                 auditState.result = { label: '通过', type: 'success' };
                 auditState.stats.passed++;
