@@ -1,6 +1,6 @@
 import { storage } from 'wxt/storage';
 
-interface AuditRecordData {
+export interface AuditRecord {
   productId: string;
   productTitle: string;
   productImage: string;
@@ -15,86 +15,70 @@ interface AuditRecordData {
   imageResponse?: string;
   scopeRequest?: string;
   scopeResponse?: string;
+  userId?: string;
+  username?: string;
 }
 
 interface ApiConfig {
-  apiUrl: string;
-  apiKey: string;
+  url: string;
+  key?: string;
 }
 
 class AuditApiClient {
-  private async getConfig(): Promise<ApiConfig | null> {
-    try {
-      const stored = await storage.getItem<ApiConfig>('local:audit_api_config');
-      
-      // Fallback to environment variables if not in storage
-      const apiUrl = stored?.apiUrl || import.meta.env.VITE_API_URL;
-      const apiKey = stored?.apiKey || import.meta.env.VITE_API_KEY;
-      
-      if (!apiUrl || !apiKey) {
-        console.warn('[AuditAPI] API URL or API Key is missing');
-        return null;
-      }
-      
-      return { apiUrl, apiKey };
-    } catch (error) {
-      console.error('[AuditAPI] Failed to get config:', error);
-      return null;
-    }
+  private async getConfig(): Promise<ApiConfig> {
+    const config = await storage.getItem<ApiConfig>('local:audit_api_config');
+    return config || { url: 'http://localhost:3000/api' };
   }
 
-  async createRecord(data: AuditRecordData, retryCount = 1): Promise<{ success: boolean; error?: string }> {
+  private async getAuthHeaders(): Promise<Record<string, string>> {
+    const token = await storage.getItem<string>('local:auth_token');
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  }
+
+  async createRecord(record: AuditRecord, retryCount = 1): Promise<{ success: boolean; error?: string }> {
     const config = await this.getConfig();
-    
-    if (!config) {
-      console.warn('[AuditAPI] Skipping API call - configuration missing');
-      return { success: false, error: 'API configuration missing' };
+    const authHeaders = await this.getAuthHeaders();
+
+    // Get current user info to attach if not present
+    const userInfo = await storage.getItem<any>('local:user_info');
+    if (userInfo && !record.userId) {
+      record.userId = userInfo.id;
+      record.username = userInfo.username;
     }
 
-    const endpoint = `${config.apiUrl}/api/audit-records`;
-    
+    const endpoint = `${config.url}/audit-records`;
+
     // Prepare the request body
     const requestBody = {
-      productId: data.productId,
-      productTitle: data.productTitle,
-      productImage: data.productImage,
-      submitTime: data.submitTime.toISOString(),
-      aiProcessingTime: data.aiProcessingTime,
-      rejectionReason: data.rejectionReason,
-      auditStage: data.auditStage,
-      apiError: data.apiError,
-      textRequest: data.textRequest,
-      textResponse: data.textResponse,
-      imageRequest: data.imageRequest,
-      imageResponse: data.imageResponse,
-      scopeRequest: data.scopeRequest,
-      scopeResponse: data.scopeResponse
+      ...record,
+      submitTime: record.submitTime.toISOString()
     };
 
     let lastError: string = '';
 
     for (let attempt = 0; attempt <= retryCount; attempt++) {
       try {
-        console.log(`[AuditAPI] Sending record for product ${data.productId} (attempt ${attempt + 1}/${retryCount + 1})`);
-        
+        console.log(`[AuditAPI] Sending record for product ${record.productId} (attempt ${attempt + 1}/${retryCount + 1})`);
+
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-API-Key': config.apiKey
+            ...(config.key ? { 'X-API-Key': config.key } : {}),
+            ...authHeaders
           },
           body: JSON.stringify(requestBody)
         });
 
         if (response.ok) {
           const result = await response.json();
-          console.log(`[AuditAPI] Successfully created record for product ${data.productId}`, result);
+          console.log(`[AuditAPI] Successfully created record for product ${record.productId}`, result);
           return { success: true };
         } else {
           const errorText = await response.text();
           lastError = `HTTP ${response.status}: ${errorText}`;
           console.error(`[AuditAPI] Failed to create record (attempt ${attempt + 1}):`, lastError);
-          
+
           // Don't retry on client errors (4xx)
           if (response.status >= 400 && response.status < 500) {
             break;
@@ -113,9 +97,9 @@ class AuditApiClient {
       }
     }
 
-    console.error(`[AuditAPI] All attempts failed for product ${data.productId}:`, lastError);
+    console.error(`[AuditAPI] All attempts failed for product ${record.productId}:`, lastError);
     return { success: false, error: lastError };
   }
 }
 
-export const auditApi = new AuditApiClient();
+export const auditRecordAPI = new AuditApiClient();

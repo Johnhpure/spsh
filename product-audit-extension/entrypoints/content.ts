@@ -1,3 +1,4 @@
+import { storage } from 'wxt/storage';
 import { defineContentScript } from 'wxt/sandbox';
 import type { ContentScriptContext } from 'wxt/client';
 import { createShadowRootUi } from 'wxt/client';
@@ -7,7 +8,7 @@ import { aliyunGreen } from '@/utils/aliyun_green';
 import { aliyunOcr } from '@/utils/aliyun_ocr';
 import { deepseek } from '@/utils/deepseek';
 import { getLabelDescription } from '@/utils/aliyun_labels';
-import { auditApi } from '@/utils/auditApi';
+import { auditRecordAPI } from '@/utils/auditApi';
 import './overlay.css';
 
 export default defineContentScript({
@@ -367,7 +368,11 @@ function createUi(ctx: any) {
 
                 try {
                   log(`ID ${id}: 正在发送审核记录到后端...`);
-                  const apiResult = await auditApi.createRecord({
+
+                  // Get User Info
+                  const userInfo = await storage.getItem<any>('local:user_info');
+
+                  const apiResult = await auditRecordAPI.createRecord({
                     productId: String(id),
                     productTitle: name,
                     productImage: mainImage || '',
@@ -381,7 +386,9 @@ function createUi(ctx: any) {
                     imageRequest: auditState.imageRequest,
                     imageResponse: auditState.imageResponse,
                     scopeRequest: auditState.scopeRequest,
-                    scopeResponse: auditState.scopeResponse
+                    scopeResponse: auditState.scopeResponse,
+                    userId: userInfo?.id,
+                    username: userInfo?.username
                   });
 
                   if (apiResult.success) {
@@ -390,7 +397,6 @@ function createUi(ctx: any) {
                     log(`ID ${id}: 发送审核记录失败: ${apiResult.error}`);
                   }
                 } catch (error) {
-                  // Catch any unexpected errors and log them without stopping the audit process
                   console.error(`[Audit] Failed to send record for ID ${id}:`, error);
                   log(`ID ${id}: 发送审核记录时发生异常: ${error}`);
                 }
