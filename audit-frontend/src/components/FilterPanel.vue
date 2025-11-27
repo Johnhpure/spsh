@@ -159,33 +159,88 @@ const handleReset = () => {
 
 <style scoped>
 .filter-panel {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.filter-panel :deep(.el-card) {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.filter-panel :deep(.el-card:hover) {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
 .filter-form {
-  padding: 10px 0;
+  padding: 16px 0;
 }
 
 .filter-item {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .filter-label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   font-size: 14px;
   color: #606266;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.filter-item :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.filter-item :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.filter-item :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.25);
+}
+
+.filter-item :deep(.el-select) {
+  width: 100%;
+}
+
+.filter-item :deep(.el-date-editor) {
+  width: 100%;
 }
 
 .button-row {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
   border-top: 1px solid #ebeef5;
+  display: flex;
+  gap: 12px;
 }
 
-.button-row .el-button {
-  margin-right: 10px;
+.button-row :deep(.el-button--primary) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.button-row :deep(.el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.button-row :deep(.el-button:not(.el-button--primary)) {
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.button-row :deep(.el-button:not(.el-button--primary):hover) {
+  transform: translateY(-2px);
 }
 
 /* 响应式调整 */

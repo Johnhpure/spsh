@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import Joi from 'joi';
 import { auditRecordController } from '../controllers/auditRecordController';
-import { authMiddleware } from '../middleware/auth';
+import { authenticateToken } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 
 const router = Router();
@@ -108,7 +108,7 @@ const getStatisticsSchema = {
  */
 router.post(
   '/',
-  authMiddleware,
+  authenticateToken,
   validate(createRecordSchema),
   auditRecordController.createRecord.bind(auditRecordController)
 );
@@ -121,7 +121,7 @@ router.post(
  */
 router.get(
   '/statistics',
-  authMiddleware,
+  authenticateToken,
   validate(getStatisticsSchema),
   auditRecordController.getStatistics.bind(auditRecordController)
 );
@@ -134,7 +134,7 @@ router.get(
  */
 router.get(
   '/export',
-  authMiddleware,
+  authenticateToken,
   auditRecordController.exportRecords.bind(auditRecordController)
 );
 
@@ -145,7 +145,7 @@ router.get(
  */
 router.get(
   '/:id',
-  authMiddleware,
+  authenticateToken,
   auditRecordController.getRecordById.bind(auditRecordController)
 );
 
@@ -156,7 +156,7 @@ router.get(
  */
 router.get(
   '/',
-  authMiddleware,
+  authenticateToken,
   validate(getRecordsSchema),
   auditRecordController.getRecords.bind(auditRecordController)
 );

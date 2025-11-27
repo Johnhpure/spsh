@@ -1,24 +1,53 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import Dashboard from '../views/Dashboard.vue';
+import RecordList from '../views/RecordList.vue';
+import RecordDetail from '../views/RecordDetail.vue';
+import Login from '../views/Login.vue';
+import UserManagement from '../views/UserManagement.vue';
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(),
   routes: [
     {
-      path: '/',
-      name: 'records',
-      component: () => import('../views/RecordList.vue')
+      path: '/login',
+      name: 'Login',
+      component: Login,
+      meta: { public: true }
     },
     {
-      path: '/records/:id',
-      name: 'record-detail',
-      component: () => import('../views/RecordDetail.vue')
+      path: '/',
+      redirect: '/dashboard'
     },
     {
       path: '/dashboard',
-      name: 'dashboard',
-      component: () => import('../views/Dashboard.vue')
+      name: 'Dashboard',
+      component: Dashboard
+    },
+    {
+      path: '/records',
+      name: 'RecordList',
+      component: RecordList
+    },
+    {
+      path: '/records/:id',
+      name: 'RecordDetail',
+      component: RecordDetail
+    },
+    {
+      path: '/users',
+      name: 'UserManagement',
+      component: UserManagement
     }
   ]
+});
+
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('auth_token');
+  if (!to.meta.public && !token) {
+    next('/login');
+  } else {
+    next();
+  }
 });
 
 export default router;

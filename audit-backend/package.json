@@ -18,6 +18,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/uuid": "^10.0.0",
+    "axios": "^1.13.2",
+    "bcryptjs": "^3.0.3",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -25,9 +30,11 @@
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
     "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.6.5",
     "node-cache": "^5.1.2",
     "typescript": "^5.3.3",
+    "uuid": "^13.0.0",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^5.0.0"
   },

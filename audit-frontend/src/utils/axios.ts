@@ -11,13 +11,21 @@ const axiosInstance: AxiosInstance = axios.create({
   }
 });
 
-// 请求拦截器 - 添加API密钥
+// 请求拦截器 - 添加认证 token
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // 添加 JWT token
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // 添加 API Key（如果有）
     const apiKey = import.meta.env.VITE_API_KEY;
     if (apiKey) {
       config.headers['X-API-Key'] = apiKey;
     }
+
     return config;
   },
   (error: AxiosError) => {
@@ -49,11 +57,11 @@ axiosInstance.interceptors.response.use(
       if (retryCount < 3) {
         (config as any)._retryCount = retryCount + 1;
         ElMessage.warning(`正在重试... (${retryCount + 1}/3)`);
-        
+
         // 指数退避
         const delay = Math.pow(2, retryCount) * 1000;
         await new Promise(resolve => setTimeout(resolve, delay));
-        
+
         return axiosInstance(config!);
       } else {
         ElMessage.error('网络连接失败，请检查网络后重试');
@@ -63,13 +71,20 @@ axiosInstance.interceptors.response.use(
     // 处理不同的HTTP错误状态
     if (error.response) {
       const { status } = error.response;
-      
+
       switch (status) {
         case 400:
           ElMessage.error('请求参数错误');
           break;
         case 401:
-          ElMessage.error('未授权，请检查API密钥');
+          ElMessage.error('登录已过期，请重新登录');
+          // 清除本地存储的认证信息
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user_info');
+          // 重定向到登录页
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
           break;
         case 404:
           ElMessage.error('请求的资源不存在');

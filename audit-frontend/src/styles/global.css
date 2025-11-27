@@ -1,4 +1,4 @@
-/* 全局样式 */
+/* 全局样式 - 现代化设计 */
 
 * {
   margin: 0;
@@ -22,27 +22,92 @@ body,
   padding: 20px;
 }
 
-/* 页面标题 */
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  margin-bottom: 20px;
-  color: #303133;
+/* Element Plus 组件样式覆盖 */
+.el-button {
+  border-radius: 10px;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 卡片间距 */
+.el-button--primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+}
+
+.el-button--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
 .el-card {
-  margin-bottom: 20px;
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
 }
 
-/* 表格样式优化 */
+.el-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
 .el-table {
-  font-size: 14px;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .el-table th {
-  background-color: #f5f7fa;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
   font-weight: 600;
+  border: none;
+}
+
+.el-table td {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.el-pagination {
+  gap: 8px;
+}
+
+.el-pager li {
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.el-pager li.is-active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.el-tag {
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-weight: 500;
+}
+
+.el-input__wrapper {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.el-input__wrapper:hover {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.el-input__wrapper.is-focus {
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.25);
+}
+
+.el-select-dropdown {
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.el-date-picker {
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 /* 图片缩略图 */
@@ -50,18 +115,15 @@ body,
   width: 60px;
   height: 60px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .thumbnail:hover {
   transform: scale(1.1);
-}
-
-/* 状态标签 */
-.stage-tag {
-  font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 /* 加载状态 */
@@ -80,6 +142,10 @@ body,
   min-height: 400px;
 }
 
+.el-empty {
+  padding: 60px 0;
+}
+
 /* 错误状态 */
 .error-container {
   display: flex;
@@ -88,32 +154,6 @@ body,
   align-items: center;
   min-height: 400px;
   color: #f56c6c;
-}
-
-/* 筛选面板 */
-.filter-panel {
-  background: #fff;
-  padding: 20px;
-  border-radius: 4px;
-  margin-bottom: 20px;
-}
-
-.filter-row {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.filter-item {
-  flex: 1;
-  min-width: 200px;
-}
-
-.filter-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
 }
 
 /* 统计卡片 */
@@ -151,14 +191,14 @@ body,
   font-weight: 600;
   margin-bottom: 16px;
   color: #303133;
-  border-left: 4px solid #409eff;
+  border-left: 4px solid #667eea;
   padding-left: 12px;
 }
 
 .json-viewer {
   background: #f5f7fa;
   border: 1px solid #dcdfe6;
-  border-radius: 4px;
+  border-radius: 12px;
   padding: 16px;
   overflow-x: auto;
 }
@@ -169,6 +209,37 @@ body,
   font-size: 13px;
   line-height: 1.6;
   color: #303133;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease;
+}
+
+.slide-in {
+  animation: slideIn 0.5s ease;
 }
 
 /* 响应式设计 */
@@ -185,27 +256,6 @@ body,
 @media (max-width: 768px) {
   .container {
     padding: 12px;
-  }
-
-  .page-title {
-    font-size: 20px;
-  }
-
-  .filter-row {
-    flex-direction: column;
-  }
-
-  .filter-item {
-    width: 100%;
-    min-width: unset;
-  }
-
-  .filter-actions {
-    flex-direction: column;
-  }
-
-  .filter-actions .el-button {
-    width: 100%;
   }
 
   .chart-container {
@@ -241,15 +291,6 @@ body,
 @media (max-width: 480px) {
   .container {
     padding: 8px;
-  }
-
-  .page-title {
-    font-size: 18px;
-    margin-bottom: 15px;
-  }
-
-  .el-card {
-    margin-bottom: 15px;
   }
 
   .stat-value {
@@ -312,4 +353,24 @@ body,
 
 .gap-12 {
   gap: 12px;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #5568d3 0%, #653a8b 100%);
 }

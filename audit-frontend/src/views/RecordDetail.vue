@@ -1,12 +1,12 @@
 <template>
   <div class="record-detail-container">
-    <el-page-header @back="goBack" title="返回列表">
-      <template #content>
-        <span class="page-title">审核记录详情</span>
-      </template>
-    </el-page-header>
+    <div class="header-actions">
+      <el-button @click="goBack" class="back-btn">
+        <span class="icon">⬅</span> 返回列表
+      </el-button>
+    </div>
 
-    <!-- 错误状态 -->
+    <!-- Error State -->
     <ErrorState
       v-if="error && !loading"
       title="加载失败"
@@ -16,13 +16,11 @@
 
     <div v-loading="loading" class="detail-content">
       <template v-if="!loading && !error && record">
-        <!-- 商品基本信息 -->
-        <el-card class="info-card" shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <span>商品基本信息</span>
-            </div>
-          </template>
+        <!-- Basic Info -->
+        <div class="info-card">
+          <div class="card-header">
+            <span>商品基本信息</span>
+          </div>
           
           <div class="product-info">
             <div class="product-image-section">
@@ -43,60 +41,64 @@
             </div>
             
             <div class="product-details">
-              <el-descriptions :column="1" border>
-                <el-descriptions-item label="商品ID">
-                  {{ record.productId }}
-                </el-descriptions-item>
-                <el-descriptions-item label="商品标题">
-                  {{ record.productTitle }}
-                </el-descriptions-item>
-              </el-descriptions>
+              <div class="detail-item">
+                <span class="label">商品ID</span>
+                <span class="value">{{ record.productId }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">商品标题</span>
+                <span class="value">{{ record.productTitle }}</span>
+              </div>
             </div>
           </div>
-        </el-card>
+        </div>
 
-        <!-- 审核信息 -->
-        <el-card class="info-card" shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <span>审核信息</span>
-            </div>
-          </template>
+        <!-- Audit Info -->
+        <div class="info-card">
+          <div class="card-header">
+            <span>审核信息</span>
+          </div>
           
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="审核阶段">
-              <el-tag :type="getStageTagType(record.auditStage)">
-                {{ getStageLabel(record.auditStage) }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="失败原因">
-              {{ record.rejectionReason }}
-            </el-descriptions-item>
-            <el-descriptions-item label="提交时间">
-              {{ formatDateTime(record.submitTime) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="AI处理时间">
-              {{ record.aiProcessingTime }} ms
-            </el-descriptions-item>
-            <el-descriptions-item label="记录创建时间">
-              {{ formatDateTime(record.createdAt) }}
-            </el-descriptions-item>
-            <el-descriptions-item v-if="record.apiError" label="API错误">
-              <el-text type="danger">{{ record.apiError }}</el-text>
-            </el-descriptions-item>
-          </el-descriptions>
-        </el-card>
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="label">审核阶段</span>
+              <span class="value">
+                <span class="stage-badge" :class="record.auditStage">
+                  {{ getStageLabel(record.auditStage) }}
+                </span>
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="label">失败原因</span>
+              <span class="value reason-text">{{ record.rejectionReason }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">提交时间</span>
+              <span class="value">{{ formatDateTime(record.submitTime) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">AI处理时间</span>
+              <span class="value">{{ record.aiProcessingTime }} ms</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">记录创建时间</span>
+              <span class="value">{{ formatDateTime(record.createdAt) }}</span>
+            </div>
+            <div v-if="record.apiError" class="detail-item full-width">
+              <span class="label">API错误</span>
+              <span class="value error-text">{{ record.apiError }}</span>
+            </div>
+          </div>
+        </div>
 
-        <!-- API请求/响应数据 -->
-        <el-card class="info-card" shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <span>API请求/响应数据</span>
-            </div>
-          </template>
+        <!-- API Data -->
+        <div class="info-card">
+          <div class="card-header">
+            <span>API请求/响应数据</span>
+          </div>
           
-          <el-collapse accordion>
-            <!-- 文本审核 -->
+          <el-collapse accordion class="custom-collapse">
+            <!-- Text Audit -->
             <el-collapse-item
               v-if="record.textRequest || record.textResponse"
               title="文本审核"
@@ -112,7 +114,7 @@
               </div>
             </el-collapse-item>
 
-            <!-- 图片审核 -->
+            <!-- Image Audit -->
             <el-collapse-item
               v-if="record.imageRequest || record.imageResponse"
               title="图片审核"
@@ -128,7 +130,7 @@
               </div>
             </el-collapse-item>
 
-            <!-- 经营范围审核 -->
+            <!-- Scope Audit -->
             <el-collapse-item
               v-if="record.scopeRequest || record.scopeResponse"
               title="经营范围审核"
@@ -150,7 +152,7 @@
             description="暂无API请求/响应数据"
             :image-size="100"
           />
-        </el-card>
+        </div>
       </template>
 
       <el-empty v-if="!loading && !error && !record" description="记录不存在" />
@@ -170,12 +172,12 @@ import ErrorState from '../components/ErrorState.vue';
 const router = useRouter();
 const route = useRoute();
 
-// 状态管理
+// State
 const loading = ref(false);
 const error = ref(false);
 const record = ref<AuditRecord | null>(null);
 
-// 计算属性：是否有API数据
+// Computed
 const hasApiData = computed(() => {
   if (!record.value) return false;
   return !!(
@@ -188,7 +190,7 @@ const hasApiData = computed(() => {
   );
 });
 
-// 加载记录详情
+// Load Data
 const loadRecordDetail = async () => {
   const recordId = route.params.id as string;
   if (!recordId) {
@@ -209,33 +211,21 @@ const loadRecordDetail = async () => {
   }
 };
 
-// 返回列表
+// Back
 const goBack = () => {
-  router.push('/');
+  router.push('/records');
 };
 
-// 格式化JSON
+// Helpers
 const formatJSON = (jsonString: string): string => {
   try {
     const parsed = JSON.parse(jsonString);
     return JSON.stringify(parsed, null, 2);
   } catch (error) {
-    // 如果解析失败，返回原始字符串
     return jsonString;
   }
 };
 
-// 获取审核阶段标签类型
-const getStageTagType = (stage: string) => {
-  const typeMap: Record<string, any> = {
-    text: 'primary',
-    image: 'success',
-    business_scope: 'warning'
-  };
-  return typeMap[stage] || 'info';
-};
-
-// 获取审核阶段标签文本
 const getStageLabel = (stage: string) => {
   const labelMap: Record<string, string> = {
     text: '文本审核',
@@ -245,7 +235,6 @@ const getStageLabel = (stage: string) => {
   return labelMap[stage] || stage;
 };
 
-// 格式化日期时间
 const formatDateTime = (dateString: string) => {
   const date = new Date(dateString);
   return date.toLocaleString('zh-CN', {
@@ -258,7 +247,6 @@ const formatDateTime = (dateString: string) => {
   });
 };
 
-// 组件挂载时加载数据
 onMounted(() => {
   loadRecordDetail();
 });
@@ -266,37 +254,63 @@ onMounted(() => {
 
 <style scoped>
 .record-detail-container {
-  padding: 20px;
+  animation: fadeIn 0.5s ease;
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #303133;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.detail-content {
-  margin-top: 20px;
-  min-height: 400px;
+.header-actions {
+  margin-bottom: 24px;
+}
+
+.back-btn {
+  border-radius: 50px;
+  padding: 10px 20px;
+  font-weight: 600;
+  border: none;
+  background: white;
+  box-shadow: var(--ui-shadow);
+  color: var(--ui-text-main);
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ui-shadow-hover);
+  background: white;
+  color: var(--ui-primary);
 }
 
 .info-card {
-  margin-bottom: 20px;
+  background: var(--ui-card-bg);
+  border-radius: var(--ui-card-radius);
+  box-shadow: var(--ui-shadow);
+  padding: 32px;
+  margin-bottom: 24px;
+  transition: all 0.3s ease;
+}
+
+.info-card:hover {
+  box-shadow: var(--ui-shadow-hover);
 }
 
 .card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-  font-size: 16px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ui-text-main);
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .product-info {
   display: flex;
-  gap: 20px;
+  gap: 32px;
 }
 
 .product-image-section {
@@ -306,33 +320,110 @@ onMounted(() => {
 .product-image {
   width: 200px;
   height: 200px;
-  border-radius: 8px;
-  cursor: pointer;
+  border-radius: 16px;
+  box-shadow: var(--ui-shadow);
+  transition: all 0.3s ease;
+}
+
+.product-image:hover {
+  transform: scale(1.02);
+  box-shadow: var(--ui-shadow-hover);
 }
 
 .image-error {
+  width: 200px;
+  height: 200px;
+  background-color: #f2f2f7;
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 200px;
-  height: 200px;
-  background-color: #f5f7fa;
-  border-radius: 8px;
-  color: #909399;
-}
-
-.image-error .el-icon {
-  font-size: 48px;
-  margin-bottom: 8px;
+  color: var(--ui-text-sub);
 }
 
 .product-details {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.detail-item .label {
+  font-size: 13px;
+  color: var(--ui-text-sub);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.detail-item .value {
+  font-size: 16px;
+  color: var(--ui-text-main);
+  font-weight: 500;
+}
+
+.reason-text {
+  color: #FF3B30;
+}
+
+.error-text {
+  color: #FF3B30;
+  font-family: monospace;
+}
+
+.stage-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #f2f2f7;
+  color: var(--ui-text-sub);
+}
+
+.stage-badge.text { background: rgba(0, 122, 255, 0.1); color: #007AFF; }
+.stage-badge.image { background: rgba(52, 199, 89, 0.1); color: #34C759; }
+.stage-badge.business_scope { background: rgba(255, 149, 0, 0.1); color: #FF9500; }
+
+/* Custom Collapse */
+.custom-collapse {
+  border: none;
+}
+
+:deep(.el-collapse-item__header) {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ui-text-main);
+  border-bottom: 1px solid var(--ui-border);
+  background: transparent;
+}
+
+:deep(.el-collapse-item__wrap) {
+  border-bottom: 1px solid var(--ui-border);
+  background: transparent;
+}
+
+:deep(.el-collapse-item__content) {
+  padding: 24px 0;
 }
 
 .api-section {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .api-section:last-child {
@@ -340,116 +431,38 @@ onMounted(() => {
 }
 
 .api-section h4 {
-  margin: 0 0 10px 0;
+  margin: 0 0 12px 0;
   font-size: 14px;
   font-weight: 600;
-  color: #606266;
+  color: var(--ui-text-sub);
+  text-transform: uppercase;
 }
 
 .json-content {
-  background-color: #f5f7fa;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  padding: 12px;
+  background: #f2f2f7;
+  border-radius: 12px;
+  padding: 20px;
   margin: 0;
   overflow-x: auto;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
   font-size: 13px;
   line-height: 1.6;
-  color: #303133;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+  color: var(--ui-text-main);
 }
 
-:deep(.el-collapse-item__header) {
-  font-weight: 500;
-  font-size: 15px;
-}
-
-:deep(.el-descriptions__label) {
-  font-weight: 500;
-}
-
-/* 响应式设计 */
-@media (max-width: 1024px) {
-  .record-detail-container {
-    padding: 15px;
-  }
-}
-
+/* Responsive */
 @media (max-width: 768px) {
-  .record-detail-container {
-    padding: 10px;
-  }
-
-  .page-title {
-    font-size: 18px;
-  }
-
   .product-info {
     flex-direction: column;
+    align-items: center;
   }
-
-  .product-image {
+  
+  .product-details {
     width: 100%;
-    max-width: 300px;
-    height: auto;
-    aspect-ratio: 1;
   }
-
-  .image-error {
-    width: 100%;
-    max-width: 300px;
-    height: auto;
-    aspect-ratio: 1;
-  }
-
-  :deep(.el-descriptions) {
-    font-size: 14px;
-  }
-
-  :deep(.el-descriptions__label) {
-    width: 100px;
-  }
-
-  .card-header {
-    font-size: 15px;
-  }
-
-  .json-content {
-    font-size: 12px;
-    padding: 10px;
-  }
-}
-
-@media (max-width: 480px) {
-  .page-title {
-    font-size: 16px;
-  }
-
-  .info-card {
-    margin-bottom: 15px;
-  }
-
-  :deep(.el-descriptions) {
-    font-size: 12px;
-  }
-
-  :deep(.el-descriptions__label) {
-    width: 80px;
-  }
-
-  .card-header {
-    font-size: 14px;
-  }
-
-  .api-section h4 {
-    font-size: 13px;
-  }
-
-  .json-content {
-    font-size: 11px;
-    padding: 8px;
+  
+  .details-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
