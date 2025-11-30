@@ -1,4 +1,5 @@
 import { storage } from 'wxt/storage';
+import { browser } from 'wxt/browser';
 
 export interface AuditRecord {
   productId: string;
@@ -35,10 +36,44 @@ class AuditApiClient {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 
-  async createRecord(record: AuditRecord, retryCount = 1): Promise<{ success: boolean; error?: string }> {
+  private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
     const config = await this.getConfig();
     const authHeaders = await this.getAuthHeaders();
 
+    const url = `${config.url}${endpoint}`;
+
+    const finalOptions = {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(config.key ? { 'X-API-Key': config.key } : {}),
+        ...authHeaders,
+        ...options.headers,
+      },
+    };
+
+    try {
+      // Use Background Proxy via WXT/Browser API
+      const response = await browser.runtime.sendMessage({
+        type: 'API_REQUEST',
+        payload: {
+          url,
+          options: finalOptions
+        }
+      }) as { success: boolean; data?: any; error?: string };
+
+      if (!response.success) {
+        throw new Error(response.error || 'Unknown background error');
+      }
+
+      return response.data;
+    } catch (e) {
+      console.error(`[AuditAPI] Request to ${endpoint} failed:`, e);
+      throw e;
+    }
+  }
+
+  async createRecord(record: AuditRecord, retryCount = 1): Promise<{ success: boolean; error?: string }> {
     // Get current user info to attach if not present
     const userInfo = await storage.getItem<any>('local:user_info');
     if (userInfo && !record.userId) {
@@ -46,9 +81,6 @@ class AuditApiClient {
       record.username = userInfo.username;
     }
 
-    const endpoint = `${config.url}/audit-records`;
-
-    // Prepare the request body
     const requestBody = {
       ...record,
       submitTime: record.submitTime.toISOString()
@@ -60,33 +92,24 @@ class AuditApiClient {
       try {
         console.log(`[AuditAPI] Sending record for product ${record.productId} (attempt ${attempt + 1}/${retryCount + 1})`);
 
-        const response = await fetch(endpoint, {
+        const result = await this.request('/audit-records', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(config.key ? { 'X-API-Key': config.key } : {}),
-            ...authHeaders
-          },
           body: JSON.stringify(requestBody)
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          console.log(`[AuditAPI] Successfully created record for product ${record.productId}`, result);
-          return { success: true };
-        } else {
-          const errorText = await response.text();
-          lastError = `HTTP ${response.status}: ${errorText}`;
-          console.error(`[AuditAPI] Failed to create record (attempt ${attempt + 1}):`, lastError);
+        console.log(`[AuditAPI] Successfully created record for product ${record.productId}`, result);
+        return { success: true };
 
-          // Don't retry on client errors (4xx)
-          if (response.status >= 400 && response.status < 500) {
-            break;
-          }
-        }
       } catch (error) {
         lastError = String(error);
         console.error(`[AuditAPI] Request failed (attempt ${attempt + 1}):`, error);
+
+        // If it's a client error (e.g. 400), don't retry? 
+        // The background script returns generic error strings for HTTP errors, so hard to distinguish status codes easily 
+        // unless we parse the error string "HTTP 4xx".
+        if (lastError.includes('HTTP 4')) {
+          break;
+        }
       }
 
       // Wait before retry (exponential backoff)
@@ -99,6 +122,51 @@ class AuditApiClient {
 
     console.error(`[AuditAPI] All attempts failed for product ${record.productId}:`, lastError);
     return { success: false, error: lastError };
+  }
+
+  async login(credentials: { username: string; password: string }): Promise<{ success: boolean; token?: string; user?: any; error?: string }> {
+    try {
+      const result = await this.request('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials)
+      });
+
+      if (result.success) {
+        return { success: true, token: result.token, user: result.user };
+      } else {
+        return { success: false, error: result.error };
+      }
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  }
+
+  async getStatistics(startDate?: Date, endDate?: Date): Promise<{ success: boolean; data?: any; error?: string }> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate.toISOString());
+    if (endDate) params.append('endDate', endDate.toISOString());
+    const queryString = params.toString();
+    const endpoint = `/audit-records/statistics${queryString ? '?' + queryString : ''}`;
+
+    try {
+      const result = await this.request(endpoint, {
+        method: 'GET'
+      });
+      return { success: true, data: result.data };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  }
+
+  async getSystemSettings(): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const result = await this.request('/settings', {
+        method: 'GET'
+      });
+      return { success: true, data: result.data };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
   }
 }
 

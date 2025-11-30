@@ -1,4 +1,5 @@
 import { storage } from 'wxt/storage';
+import { getAuthToken } from './auth';
 
 interface AuditRecordData {
   productId: string;
@@ -19,24 +20,22 @@ interface AuditRecordData {
 
 interface ApiConfig {
   apiUrl: string;
-  apiKey: string;
 }
 
 class AuditApiClient {
   private async getConfig(): Promise<ApiConfig | null> {
     try {
-      const stored = await storage.getItem<ApiConfig>('local:audit_api_config');
+      const stored = await storage.getItem<{ apiUrl: string }>('local:audit_api_config');
       
       // Fallback to environment variables if not in storage
       const apiUrl = stored?.apiUrl || import.meta.env.VITE_API_URL;
-      const apiKey = stored?.apiKey || import.meta.env.VITE_API_KEY;
       
-      if (!apiUrl || !apiKey) {
-        console.warn('[AuditAPI] API URL or API Key is missing');
+      if (!apiUrl) {
+        console.warn('[AuditAPI] API URL is missing');
         return null;
       }
       
-      return { apiUrl, apiKey };
+      return { apiUrl };
     } catch (error) {
       console.error('[AuditAPI] Failed to get config:', error);
       return null;
@@ -49,6 +48,12 @@ class AuditApiClient {
     if (!config) {
       console.warn('[AuditAPI] Skipping API call - configuration missing');
       return { success: false, error: 'API configuration missing' };
+    }
+
+    const token = await getAuthToken();
+    if (!token) {
+      console.warn('[AuditAPI] No authentication token found');
+      return { success: false, error: 'Authentication required' };
     }
 
     const endpoint = `${config.apiUrl}/api/audit-records`;
@@ -81,7 +86,7 @@ class AuditApiClient {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-API-Key': config.apiKey
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify(requestBody)
         });

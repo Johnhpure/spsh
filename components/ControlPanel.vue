@@ -28,31 +28,30 @@ const props = defineProps<{
   }[];
 }>();
 
-defineEmits(['start', 'stop']);
+defineEmits(['start', 'stop', 'logout', 'authError']);
 
 const isMinimized = ref(false);
 const activeTab = ref<'current' | 'passed' | 'rejected'>('current');
 const showSettings = ref(false);
 const isDarkMode = ref(false);
+const userInfo = ref<{ username: string; role: string } | null>(null);
 const settingsForm = ref({
   accessKeyId: '',
   accessKeySecret: '',
   deepseekApiKey: '',
-  auditApiUrl: '',
-  auditApiKey: ''
+  auditApiUrl: ''
 });
 
 const openSettings = async () => {
   const aliyunStored = await storage.getItem<{ accessKeyId: string; accessKeySecret: string }>('local:aliyun_config');
   const deepseekStored = await storage.getItem<{ deepseekApiKey: string }>('local:deepseek_config');
-  const auditApiStored = await storage.getItem<{ apiUrl: string; apiKey: string }>('local:audit_api_config');
+  const auditApiStored = await storage.getItem<{ apiUrl: string }>('local:audit_api_config');
   
   settingsForm.value = {
     accessKeyId: aliyunStored?.accessKeyId || import.meta.env.WXT_ALIYUN_ACCESS_KEY_ID || '',
     accessKeySecret: aliyunStored?.accessKeySecret || import.meta.env.WXT_ALIYUN_ACCESS_KEY_SECRET || '',
     deepseekApiKey: deepseekStored?.deepseekApiKey || '',
-    auditApiUrl: auditApiStored?.apiUrl || import.meta.env.VITE_API_URL || '',
-    auditApiKey: auditApiStored?.apiKey || import.meta.env.VITE_API_KEY || ''
+    auditApiUrl: auditApiStored?.apiUrl || import.meta.env.VITE_API_URL || ''
   };
   showSettings.value = true;
 };
@@ -66,8 +65,7 @@ const saveSettings = async () => {
     deepseekApiKey: settingsForm.value.deepseekApiKey.trim()
   });
   await storage.setItem('local:audit_api_config', {
-    apiUrl: settingsForm.value.auditApiUrl.trim(),
-    apiKey: settingsForm.value.auditApiKey.trim()
+    apiUrl: settingsForm.value.auditApiUrl.trim()
   });
   showSettings.value = false;
 };
@@ -94,7 +92,7 @@ const formatDate = (ts: number) => {
 
 // Draggable Logic
 const panelRef = ref<HTMLElement | null>(null);
-const position = ref({ x: window.innerWidth - 620, y: 20 }); // Initial position
+const position = ref({ x: window.innerWidth - 680, y: 20 }); // Initial position
 const isDragging = ref(false);
 const dragOffset = ref({ x: 0, y: 0 });
 
@@ -131,6 +129,12 @@ onMounted(async () => {
     if (storedDarkMode !== null) {
         isDarkMode.value = storedDarkMode;
     }
+    
+    // Load user info
+    const user = await storage.getItem<{ username: string; role: string }>('local:user_info');
+    if (user) {
+        userInfo.value = user;
+    }
 });
 
 onUnmounted(() => {
@@ -153,6 +157,10 @@ onUnmounted(() => {
         <span class="status-dot" :class="isRunning ? 'running' : 'idle'"></span>
       </div>
       <div class="header-controls">
+        <div class="user-info" v-if="userInfo" :title="`${userInfo.username} (${userInfo.role})`">
+          <span class="user-icon">👤</span>
+          <span class="username">{{ userInfo.username }}</span>
+        </div>
         <button class="icon-btn theme-btn" @click="toggleTheme" :title="isDarkMode ? '切换亮色' : '切换暗色'">
           <span v-if="isDarkMode">☀️</span>
           <span v-else>🌙</span>
@@ -161,6 +169,13 @@ onUnmounted(() => {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+        <button class="icon-btn logout-btn" @click="$emit('logout')" title="退出登录">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
           </svg>
         </button>
         <button class="icon-btn minimize-btn" @click="toggleMinimize" title="最小化">
@@ -372,10 +387,6 @@ onUnmounted(() => {
           <label>API URL</label>
           <input type="text" v-model="settingsForm.auditApiUrl" placeholder="http://localhost:3000" />
         </div>
-        <div class="form-group">
-          <label>API Key</label>
-          <input type="password" v-model="settingsForm.auditApiKey" placeholder="your-api-key" />
-        </div>
 
         <div class="settings-actions">
           <button class="action-btn secondary" @click="closeSettings">取消</button>
@@ -435,6 +446,8 @@ onUnmounted(() => {
   --color-card-bg: #2C2C2E;
   --color-border: #3A3A3C;
   --ui-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 10px 20px rgba(0, 0, 0, 0.3);
+  --color-success-soft: rgba(52, 199, 89, 0.15);
+  --color-danger-soft: rgba(255, 59, 48, 0.15);
 }
 
 /* Main Container */
@@ -483,7 +496,8 @@ onUnmounted(() => {
 }
 
 .control-panel:not(.minimized) {
-  width: 500px;
+  width: 650px;
+  min-height: 600px;
 }
 
 .control-panel.minimized {
@@ -524,6 +538,34 @@ onUnmounted(() => {
 .header-controls {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 18px;
+  font-size: 13px;
+  color: var(--color-text-main);
+}
+
+.control-panel.dark-mode .user-info {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.user-icon {
+  font-size: 16px;
+}
+
+.username {
+  font-weight: 600;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header h3 {
@@ -711,8 +753,8 @@ onUnmounted(() => {
 }
 
 .product-image-wrapper {
-  width: 70px;
-  height: 70px;
+  width: 90px;
+  height: 90px;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
@@ -742,7 +784,7 @@ onUnmounted(() => {
   font-family: 'SF Mono', 'Menlo', monospace;
   font-size: 11px;
   color: var(--color-text-main);
-  max-height: 80px;
+  max-height: 120px;
   overflow-y: auto;
   border-left: 4px solid transparent;
 }
@@ -754,7 +796,7 @@ onUnmounted(() => {
   background: var(--color-bg-secondary);
   border-radius: var(--ui-card-radius);
   padding: 12px;
-  height: 80px;
+  height: 120px;
   overflow: hidden;
 }
 .logs-container {

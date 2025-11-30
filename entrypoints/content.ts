@@ -3,11 +3,13 @@ import type { ContentScriptContext } from 'wxt/client';
 import { createShadowRootUi } from 'wxt/client';
 import { createApp, ref, reactive, h } from 'vue';
 import ControlPanel from '@/components/ControlPanel.vue';
+import LoginPanel from '@/components/LoginPanel.vue';
 import { aliyunGreen } from '@/utils/aliyun_green';
 import { aliyunOcr } from '@/utils/aliyun_ocr';
 import { deepseek } from '@/utils/deepseek';
 import { getLabelDescription } from '@/utils/aliyun_labels';
 import { auditApi } from '@/utils/auditApi';
+import { isAuthenticated, logout } from '@/utils/auth';
 import './overlay.css';
 
 export default defineContentScript({
@@ -533,25 +535,61 @@ function createUi(ctx: any) {
         }
       };
 
+      // 先检查登录状态，然后再创建应用
+      const authenticated = await isAuthenticated();
+      const showLogin = ref(!authenticated);
+
+      const handleLoginSuccess = () => {
+        showLogin.value = false;
+        log('登录成功！');
+      };
+
+      const handleLogout = async () => {
+        await logout();
+        showLogin.value = true;
+        stopAudit();
+        log('已退出登录');
+      };
+
+      const forceShowLogin = () => {
+        showLogin.value = true;
+        stopAudit();
+      };
+
       const app = createApp({
         setup() {
-          return () => h(ControlPanel, {
-            status: status.value,
-            isRunning: isRunning.value,
-            logs: logs.value,
-            auditState: auditState,
-            history: history,
-            onStart: startAudit,
-            onStop: stopAudit
-          });
+          return () => {
+            if (showLogin.value) {
+              return h(LoginPanel, {
+                onLoginSuccess: handleLoginSuccess
+              });
+            }
+            return h(ControlPanel, {
+              status: status.value,
+              isRunning: isRunning.value,
+              logs: logs.value,
+              auditState: auditState,
+              history: history,
+              onStart: startAudit,
+              onStop: stopAudit,
+              onLogout: handleLogout,
+              onAuthError: forceShowLogin
+            });
+          };
         }
       });
 
       app.mount(container);
 
-      // Auto-start if previously running
-      if (localStorage.getItem('product_audit_running') === 'true') {
-        startAudit();
+      // Log initial state
+      if (authenticated) {
+        log('已登录，欢迎使用审核功能');
+        // Auto-start if previously running
+        if (localStorage.getItem('product_audit_running') === 'true') {
+          startAudit();
+        }
+      } else {
+        log('请先登录以使用审核功能');
       }
 
       return app;

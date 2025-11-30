@@ -11,6 +11,7 @@ import auditRecordsRouter from './routes/auditRecords';
 import authRouter from './routes/auth';
 import usersRouter from './routes/users';
 import proxyRouter from './routes/proxy';
+import systemSettingsRouter from './routes/systemSettings';
 
 dotenv.config();
 
@@ -77,6 +78,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/proxy', proxyRouter);
 app.use('/api/audit-records', auditRecordsRouter);
+app.use('/api/settings', systemSettingsRouter);
 
 // 注册错误处理中间件（必须在所有路由之后）
 app.use(errorHandler);

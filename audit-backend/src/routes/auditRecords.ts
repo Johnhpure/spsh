@@ -50,6 +50,8 @@ const createRecordSchema = {
     imageResponse: Joi.string().optional().allow(''),
     scopeRequest: Joi.string().optional().allow(''),
     scopeResponse: Joi.string().optional().allow(''),
+    userId: Joi.string().optional().allow(''),
+    username: Joi.string().optional().allow(''),
   }),
 };
 

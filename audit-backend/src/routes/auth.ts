@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { login, register } from '../controllers/authController';
+import { login, register, verify } from '../controllers/authController';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 
 const router = Router();
 
 router.post('/login', login);
+router.get('/verify', authenticateToken, verify);
 // Only admin can register new users via API, or use a setup script
 router.post('/register', authenticateToken, requireAdmin, register);
 

@@ -8,10 +8,10 @@
       
       <el-form :model="form" @submit.prevent="handleLogin" label-position="top">
         <el-form-item label="用户名">
-          <el-input v-model="form.username" placeholder="请输入用户名" prefix-icon="User" />
+          <el-input v-model="form.username" placeholder="请输入用户名" :prefix-icon="User" />
         </el-form-item>
         <el-form-item label="密码">
-          <el-input v-model="form.password" type="password" placeholder="请输入密码" prefix-icon="Lock" show-password />
+          <el-input v-model="form.password" type="password" placeholder="请输入密码" :prefix-icon="Lock" show-password />
         </el-form-item>
         
         <el-button type="primary" class="login-btn" :loading="loading" @click="handleLogin">

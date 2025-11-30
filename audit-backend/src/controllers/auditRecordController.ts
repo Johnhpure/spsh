@@ -28,6 +28,8 @@ class AuditRecordController {
         imageResponse: req.body.imageResponse,
         scopeRequest: req.body.scopeRequest,
         scopeResponse: req.body.scopeResponse,
+        userId: req.body.userId,
+        username: req.body.username,
       };
 
       const createdRecord = await auditRecordService.create(recordData);
@@ -75,23 +77,23 @@ class AuditRecordController {
     try {
       // 解析筛选条件
       const filters: any = {};
-      
+
       if (req.query.productId) {
         filters.productId = req.query.productId as string;
       }
-      
+
       if (req.query.stage) {
         filters.stage = req.query.stage as string;
       }
-      
+
       if (req.query.startDate) {
         filters.startDate = new Date(req.query.startDate as string);
       }
-      
+
       if (req.query.endDate) {
         filters.endDate = new Date(req.query.endDate as string);
       }
-      
+
       if (req.query.keyword) {
         filters.keyword = req.query.keyword as string;
       }
@@ -122,7 +124,7 @@ class AuditRecordController {
     try {
       // 解析时间范围
       let timeRange;
-      
+
       if (req.query.startDate && req.query.endDate) {
         timeRange = {
           startDate: new Date(req.query.startDate as string),
@@ -150,23 +152,23 @@ class AuditRecordController {
     try {
       // 解析筛选条件（与getRecords相同）
       const filters: any = {};
-      
+
       if (req.query.productId) {
         filters.productId = req.query.productId as string;
       }
-      
+
       if (req.query.stage) {
         filters.stage = req.query.stage as string;
       }
-      
+
       if (req.query.startDate) {
         filters.startDate = new Date(req.query.startDate as string);
       }
-      
+
       if (req.query.endDate) {
         filters.endDate = new Date(req.query.endDate as string);
       }
-      
+
       if (req.query.keyword) {
         filters.keyword = req.query.keyword as string;
       }

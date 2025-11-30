@@ -22,14 +22,14 @@ class AuditRecordService {
    */
   async create(record: AuditRecord): Promise<AuditRecord> {
     const id = randomUUID();
-    
+
     const sql = `
       INSERT INTO audit_records (
         id, product_id, product_title, product_image, submit_time,
         ai_processing_time, rejection_reason, audit_stage, api_error,
         text_request, text_response, image_request, image_response,
-        scope_request, scope_response
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        scope_request, scope_response, user_id, username
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -48,6 +48,8 @@ class AuditRecordService {
       record.imageResponse || null,
       record.scopeRequest || null,
       record.scopeResponse || null,
+      record.userId || null,
+      record.username || null,
     ];
 
     await databaseManager.query<ResultSetHeader>(sql, params);
@@ -162,7 +164,7 @@ class AuditRecordService {
   async getStatistics(timeRange?: TimeRange): Promise<Statistics> {
     // 生成缓存键
     const cacheKey = this.generateStatisticsCacheKey(timeRange);
-    
+
     // 尝试从缓存获取
     const cachedStats = cacheManager.get<Statistics>(cacheKey);
     if (cachedStats) {
@@ -264,11 +266,11 @@ class AuditRecordService {
     if (!timeRange) {
       return 'statistics:all';
     }
-    const startDate = timeRange.startDate instanceof Date 
-      ? timeRange.startDate.toISOString() 
+    const startDate = timeRange.startDate instanceof Date
+      ? timeRange.startDate.toISOString()
       : timeRange.startDate;
-    const endDate = timeRange.endDate instanceof Date 
-      ? timeRange.endDate.toISOString() 
+    const endDate = timeRange.endDate instanceof Date
+      ? timeRange.endDate.toISOString()
       : timeRange.endDate;
     return `statistics:${startDate}:${endDate}`;
   }
@@ -305,6 +307,8 @@ class AuditRecordService {
       imageResponse: row.image_response || undefined,
       scopeRequest: row.scope_request || undefined,
       scopeResponse: row.scope_response || undefined,
+      userId: row.user_id || undefined,
+      username: row.username || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

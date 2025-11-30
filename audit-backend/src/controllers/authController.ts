@@ -88,3 +88,27 @@ export const register = async (req: Request, res: Response) => {
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
 };
+
+export const verify = async (req: Request, res: Response) => {
+    try {
+        // Token is already verified by authenticateToken middleware
+        // req.user is populated by the middleware
+        const user = (req as any).user;
+        
+        if (!user) {
+            return res.status(401).json({ success: false, error: 'Invalid token' });
+        }
+
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role
+            }
+        });
+    } catch (error) {
+        console.error('Verify error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+};

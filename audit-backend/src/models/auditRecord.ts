@@ -23,6 +23,8 @@ export interface AuditRecord {
   imageResponse?: string;
   scopeRequest?: string;
   scopeResponse?: string;
+  userId?: string;
+  username?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -97,6 +99,8 @@ export interface AuditRecordRow {
   image_response?: string;
   scope_request?: string;
   scope_response?: string;
+  user_id?: string;
+  username?: string;
   created_at: Date;
   updated_at: Date;
 }

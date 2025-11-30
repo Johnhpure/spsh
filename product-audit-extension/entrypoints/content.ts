@@ -106,6 +106,106 @@ function createUi(ctx: any) {
         }
       };
 
+      const handleApprove = async (row: Element, id: string) => {
+        const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
+        const approveBtn = Array.from(buttons).find(b => {
+          const text = b.textContent?.replace(/\s/g, '') || '';
+          return text.includes('通过') || text.includes('批准');
+        });
+
+        if (approveBtn) {
+          log('ID ' + id + ': 点击批准按钮');
+          (approveBtn as HTMLElement).click();
+
+          // Wait for modal to appear
+          let modalContent: Element | null = null;
+          for (let i = 0; i < 10; i++) {
+            await new Promise(r => setTimeout(r, 200));
+            modalContent = document.querySelector('.ant-modal-content');
+            if (modalContent) break;
+          }
+
+          if (modalContent) {
+            log('ID ' + id + ': 找到确认弹窗');
+            const footerBtns = modalContent.querySelectorAll('.ant-modal-footer button, .ant-modal-footer .ant-btn');
+            const confirmBtn = Array.from(footerBtns).find(b => {
+              const text = b.textContent?.replace(/\s/g, '') || '';
+              return text.includes('确认') || text.includes('批准') || b.classList.contains('ant-btn-primary');
+            });
+
+            if (confirmBtn) {
+              log('ID ' + id + ': 点击弹窗确认按钮');
+              (confirmBtn as HTMLElement).click();
+            } else {
+              log('ID ' + id + ': 未在弹窗中找到确认按钮');
+            }
+          } else {
+            // Fallback for old behavior or if modal doesn't appear
+            log('ID ' + id + ': 未检测到弹窗，尝试查找通用确认按钮');
+            const confirmBtn = document.querySelector(
+              '.el-message-box__btns .el-button--primary, .ant-modal-confirm-btns .ant-btn-primary'
+            );
+            if (confirmBtn) {
+              (confirmBtn as HTMLElement).click();
+            }
+          }
+        } else {
+          log('ID ' + id + ': 未找到批准按钮');
+        }
+      };
+
+      const handleReject = async (row: Element, id: string) => {
+        const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
+        const rejectBtn = Array.from(buttons).find(b => {
+          const text = b.textContent?.replace(/\s/g, '') || '';
+          return text.includes('拒绝') || text.includes('驳回');
+        });
+
+        if (rejectBtn) {
+          log('ID ' + id + ': 点击拒绝按钮');
+          (rejectBtn as HTMLElement).click();
+
+          // Wait for dialog and find textarea with retries
+          let reasonInput: HTMLTextAreaElement | null = null;
+          for (let i = 0; i < 5; i++) {
+            await new Promise(r => setTimeout(r, 500));
+            reasonInput = document.querySelector('.el-textarea__inner, textarea, .ant-input') as HTMLTextAreaElement;
+            if (reasonInput && reasonInput.offsetParent !== null) break; // Ensure it's visible
+          }
+
+          if (reasonInput) {
+            log('ID ' + id + ': 找到拒绝原因输入框');
+
+            // Robust React 16+ hack
+            const proto = Object.getPrototypeOf(reasonInput);
+            const valueProp = Object.getOwnPropertyDescriptor(proto, "value") || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value") || Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
+
+            if (valueProp && valueProp.set) {
+              valueProp.set.call(reasonInput, '商品内容违规');
+            } else {
+              reasonInput.value = '商品内容违规';
+            }
+
+            reasonInput.dispatchEvent(new Event('input', { bubbles: true }));
+            reasonInput.dispatchEvent(new Event('change', { bubbles: true }));
+            reasonInput.dispatchEvent(new Event('blur', { bubbles: true }));
+          } else {
+            log('ID ' + id + ': 未找到拒绝原因输入框');
+          }
+
+          const confirmBtn = document.querySelector(
+            '.el-dialog__footer .el-button--primary, .el-message-box__btns .el-button--primary, .ant-modal-footer .ant-btn-primary'
+          );
+          if (confirmBtn) {
+            (confirmBtn as HTMLElement).click();
+          } else {
+            log('ID ' + id + ': 未找到确认按钮');
+          }
+        } else {
+          log('ID ' + id + ': 未找到拒绝按钮');
+        }
+      };
+
       const startAudit = async () => {
         if (isRunning.value) return;
         isRunning.value = true;
@@ -192,28 +292,29 @@ function createUi(ctx: any) {
               }
 
               // 2. From DOM (The most reliable source for what's visible)
-              // User provided HTML shows images have class 'ant-image-img'
               const domImages = row.querySelectorAll('.ant-image-img');
               domImages.forEach((img: Element) => {
                 const src = (img as HTMLImageElement).src;
-                if (src && !src.includes('data:image')) { // Exclude base64 placeholders if any, unless they are real images
-                  // Convert relative URLs if necessary, though usually they are CDNs
+                if (src && !src.includes('data:image')) {
                   imagesToAudit.push(src);
                 }
               });
 
-              // Deduplicate
-              const uniqueImages = [...new Set(imagesToAudit.filter(url => url && url.startsWith('http')))];
+              // Deduplicate and upgrade to HTTPS
+              const uniqueImages = [...new Set(imagesToAudit
+                .filter(url => url && url.startsWith('http'))
+                .map(url => url.replace(/^http:\/\//i, 'https://'))
+              )];
 
               // Update UI State
               auditState.product = {
                 id: String(id),
                 name: name,
-                image: uniqueImages[0] || mainImage // Use first found image as cover
+                image: uniqueImages[0] || mainImage
               };
               auditState.textRequest = '';
               auditState.textResponse = '';
-              auditState.imageRequest = ''; // Will show current processing image
+              auditState.imageRequest = '';
               auditState.imageResponse = '';
               auditState.scopeRequest = '';
               auditState.scopeResponse = '';
@@ -249,7 +350,7 @@ function createUi(ctx: any) {
                 if (uniqueImages.length > 0) {
                   for (let i = 0; i < uniqueImages.length; i++) {
                     const imgUrl = uniqueImages[i];
-                    auditState.imageRequest = `[${i + 1}/${uniqueImages.length}] ${imgUrl}`; // Update UI to show progress
+                    auditState.imageRequest = `[${i + 1}/${uniqueImages.length}] ${imgUrl}`;
 
                     const imageResult = await aliyunGreen.imageModeration(imgUrl);
                     auditState.imageResponse = JSON.stringify(imageResult.response, null, 2);
@@ -273,7 +374,6 @@ function createUi(ctx: any) {
                       break; // Fail fast
                     }
 
-                    // Small delay between images to avoid rate limits
                     if (i < uniqueImages.length - 1) await new Promise(r => setTimeout(r, 500));
                   }
                 }
@@ -286,18 +386,8 @@ function createUi(ctx: any) {
                 }
 
                 if (!shopId) {
-                  // Try to scrape Shop ID from DOM
-                  // User says: <td class="ant-table-cell" style="text-align: center;">1145</td>
-                  // Heuristic: Find a cell with a number that is NOT the product ID and NOT a price/stock (hard to tell)
-                  // Let's try to find all numeric cells
                   const cells = Array.from(row.querySelectorAll('td'));
                   const numericCells = cells.map(c => c.textContent?.trim()).filter(t => t && /^\d+$/.test(t));
-
-                  // Usually Product ID is one, Shop ID is another.
-                  // If we find a number that is NOT the product ID, we assume it's the Shop ID.
-                  // This is risky but the best we can do without column index.
-                  // Let's assume Shop ID is usually smaller or appears after/before?
-                  // Let's just take the first number that is not the ID.
                   const found = numericCells.find(n => n !== String(id));
                   if (found) {
                     shopId = found;
@@ -310,7 +400,6 @@ function createUi(ctx: any) {
                 if (!shopId) {
                   log(`ID ${id}: 缺少店铺ID信息，跳过经营范围审核`);
                 } else {
-                  // Fetch Shop Details
                   try {
                     const shopRes = await fetch(`https://admin.pinhaopin.com/gateway/mall/getAdminShopDetail?shopId=${shopId}`);
                     const shopData = await shopRes.json();
@@ -336,10 +425,27 @@ function createUi(ctx: any) {
                           log(`ID ${id}: 经营范围不符 (${aiResult.reason}) -> 拒绝`);
                         }
                       } else {
-                        log(`ID ${id}: 营业执照识别失败: ${ocrResult.error}`);
-                        auditState.result = { label: '需人工审核 (OCR失败)', type: 'warning' };
-                        stopAudit();
-                        return; // Stop processing this item
+                        const errorMsg = ocrResult.error || 'Unknown error';
+                        log(`ID ${id}: 营业执照识别失败: ${errorMsg}`);
+
+                        // If failed to recognize business scope, treat as rejection and continue
+                        if (errorMsg.includes('Failed to recognize business scope')) {
+                          isRejected = true;
+                          auditStage = 'business_scope';
+                          rejectReason = `营业执照识别失败: ${errorMsg}`;
+                          auditState.result = { label: `识别失败`, type: 'danger' };
+                          log(`ID ${id}: 营业执照识别失败 -> 记录并继续下一条`);
+                        } else {
+                          // For other errors, maybe we still want to stop? 
+                          // Or just treat all OCR errors as failures?
+                          // User request specifically mentioned "Failed to recognize business scope".
+                          // But stopping the whole queue for one error is usually annoying.
+                          // Let's assume we should only change behavior for this specific error as requested, 
+                          // to avoid unintended side effects.
+                          auditState.result = { label: '需人工审核 (OCR失败)', type: 'warning' };
+                          stopAudit();
+                          return;
+                        }
                       }
                     } else {
                       log(`ID ${id}: 未找到店铺营业执照`);
@@ -362,14 +468,11 @@ function createUi(ctx: any) {
                 });
                 saveHistory();
 
-                // Send audit record to backend API
                 const auditEndTime = Date.now();
                 const aiProcessingTime = auditEndTime - auditStartTime;
 
                 try {
                   log(`ID ${id}: 正在发送审核记录到后端...`);
-
-                  // Get User Info
                   const userInfo = await storage.getItem<any>('local:user_info');
 
                   const apiResult = await auditRecordAPI.createRecord({
@@ -420,7 +523,7 @@ function createUi(ctx: any) {
               processedCount++;
               auditState.stats.processed++;
 
-              await new Promise(r => setTimeout(r, 1000)); // Wait 1s between items
+              await new Promise(r => setTimeout(r, 1000));
             }
 
             if (processedCount === 0) {
@@ -436,108 +539,23 @@ function createUi(ctx: any) {
         }
       };
 
-      // Helper functions for actions
-      const handleApprove = async (row: Element, id: string) => {
-        const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
-        const approveBtn = Array.from(buttons).find(b => {
-          const text = b.textContent?.replace(/\s/g, '') || '';
-          return text.includes('通过') || text.includes('批准');
-        });
+      const serverStats = ref<any>(null);
 
-        if (approveBtn) {
-          log('ID ' + id + ': 点击批准按钮');
-          (approveBtn as HTMLElement).click();
-
-          // Wait for modal to appear
-          let modalContent: Element | null = null;
-          for (let i = 0; i < 10; i++) {
-            await new Promise(r => setTimeout(r, 200));
-            modalContent = document.querySelector('.ant-modal-content');
-            if (modalContent) break;
+      const fetchServerStatistics = async () => {
+        try {
+          const stats = await auditRecordAPI.getStatistics();
+          if (stats) {
+            serverStats.value = stats;
+            log('已更新服务器统计数据');
           }
-
-          if (modalContent) {
-            log('ID ' + id + ': 找到确认弹窗');
-            // Find confirm button inside modal footer
-            // The user provided HTML shows: <button type="button" class="ant-btn css-1v28nim ant-btn-primary ant-btn-color-primary ant-btn-variant-solid"><span>确认批准</span></button>
-            const footerBtns = modalContent.querySelectorAll('.ant-modal-footer button, .ant-modal-footer .ant-btn');
-            const confirmBtn = Array.from(footerBtns).find(b => {
-              const text = b.textContent?.replace(/\s/g, '') || '';
-              return text.includes('确认') || text.includes('批准') || b.classList.contains('ant-btn-primary');
-            });
-
-            if (confirmBtn) {
-              log('ID ' + id + ': 点击弹窗确认按钮');
-              (confirmBtn as HTMLElement).click();
-            } else {
-              log('ID ' + id + ': 未在弹窗中找到确认按钮');
-            }
-          } else {
-            // Fallback for old behavior or if modal doesn't appear
-            log('ID ' + id + ': 未检测到弹窗，尝试查找通用确认按钮');
-            const confirmBtn = document.querySelector(
-              '.el-message-box__btns .el-button--primary, .ant-modal-confirm-btns .ant-btn-primary'
-            );
-            if (confirmBtn) {
-              (confirmBtn as HTMLElement).click();
-            }
-          }
-        } else {
-          log('ID ' + id + ': 未找到批准按钮');
+        } catch (e) {
+          console.error('Failed to fetch server statistics', e);
+          log('获取服务器统计数据失败: ' + e);
         }
       };
 
-      const handleReject = async (row: Element, id: string) => {
-        const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
-        const rejectBtn = Array.from(buttons).find(b => {
-          const text = b.textContent?.replace(/\s/g, '') || '';
-          return text.includes('拒绝') || text.includes('驳回');
-        });
-
-        if (rejectBtn) {
-          log('ID ' + id + ': 点击拒绝按钮');
-          (rejectBtn as HTMLElement).click();
-
-          // Wait for dialog and find textarea with retries
-          let reasonInput: HTMLTextAreaElement | null = null;
-          for (let i = 0; i < 5; i++) {
-            await new Promise(r => setTimeout(r, 500));
-            reasonInput = document.querySelector('.el-textarea__inner, textarea, .ant-input') as HTMLTextAreaElement;
-            if (reasonInput && reasonInput.offsetParent !== null) break; // Ensure it's visible
-          }
-
-          if (reasonInput) {
-            log('ID ' + id + ': 找到拒绝原因输入框');
-
-            // Robust React 16+ hack
-            const proto = Object.getPrototypeOf(reasonInput);
-            const valueProp = Object.getOwnPropertyDescriptor(proto, "value") || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value") || Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
-
-            if (valueProp && valueProp.set) {
-              valueProp.set.call(reasonInput, '商品内容违规');
-            } else {
-              reasonInput.value = '商品内容违规';
-            }
-
-            reasonInput.dispatchEvent(new Event('input', { bubbles: true }));
-            reasonInput.dispatchEvent(new Event('change', { bubbles: true }));
-            reasonInput.dispatchEvent(new Event('blur', { bubbles: true }));
-          } else {
-            log('ID ' + id + ': 未找到拒绝原因输入框');
-          }
-
-          const confirmBtn = document.querySelector(
-            '.el-dialog__footer .el-button--primary, .el-message-box__btns .el-button--primary, .ant-modal-footer .ant-btn-primary'
-          );
-          if (confirmBtn) {
-            (confirmBtn as HTMLElement).click();
-          } else {
-            log('ID ' + id + ': 未找到确认按钮');
-          }
-        } else {
-          log('ID ' + id + ': 未找到拒绝按钮');
-        }
-      };
+      // Initial fetch
+      fetchServerStatistics();
 
       const app = createApp({
         setup() {
@@ -547,8 +565,10 @@ function createUi(ctx: any) {
             logs: logs.value,
             auditState: auditState,
             history: history,
+            serverStats: serverStats.value,
             onStart: startAudit,
-            onStop: stopAudit
+            onStop: stopAudit,
+            onRefreshStats: fetchServerStatistics
           });
         }
       });

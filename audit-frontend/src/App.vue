@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 const route = useRoute();
+const router = useRouter();
 const collapsed = ref(false);
 const isFullscreen = ref(false);
+
+const isPublicPage = computed(() => route.meta.public === true);
 
 const toggleSidebar = () => {
   collapsed.value = !collapsed.value;
@@ -21,11 +24,21 @@ const toggleFullscreen = () => {
     }
   }
 };
+
+const handleLogout = () => {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user_info');
+  router.push('/login');
+};
 </script>
 
 <template>
   <div id="app">
-    <div class="layout-container">
+    <!-- Public Layout (Login) -->
+    <router-view v-if="isPublicPage" />
+
+    <!-- Dashboard Layout -->
+    <div v-else class="layout-container">
       <!-- Sidebar -->
       <aside :class="['sidebar', { collapsed }]">
         <div class="logo-container">
@@ -50,6 +63,18 @@ const toggleFullscreen = () => {
               <span v-if="!collapsed" class="label">审核记录</span>
             </transition>
           </router-link>
+          <router-link to="/users" class="nav-item" :class="{ active: route.path === '/users' }">
+            <span class="icon">👥</span>
+            <transition name="fade">
+              <span v-if="!collapsed" class="label">用户管理</span>
+            </transition>
+          </router-link>
+          <router-link to="/settings" class="nav-item" :class="{ active: route.path === '/settings' }">
+            <span class="icon">⚙️</span>
+            <transition name="fade">
+              <span v-if="!collapsed" class="label">系统设置</span>
+            </transition>
+          </router-link>
         </nav>
 
         <div class="sidebar-footer">
@@ -65,7 +90,13 @@ const toggleFullscreen = () => {
         <!-- Header -->
         <header class="top-header">
           <div class="header-left">
-            <h2 class="page-title-header">{{ route.name === 'dashboard' ? '统计仪表板' : (route.name === 'records' ? '审核记录' : '详情') }}</h2>
+            <h2 class="page-title-header">{{ 
+              route.name === 'Dashboard' ? '统计仪表板' : 
+              (route.name === 'RecordList' ? '审核记录' : 
+              (route.name === 'RecordDetail' ? '详情' : 
+              (route.name === 'UserManagement' ? '用户管理' : 
+              (route.name === 'Settings' ? '系统设置' : '')))) 
+            }}</h2>
           </div>
           <div class="header-right">
             <button class="icon-btn" @click="toggleFullscreen" title="全屏切换">
@@ -75,6 +106,9 @@ const toggleFullscreen = () => {
             <div class="user-profile">
               <div class="avatar">A</div>
               <span class="username">Admin</span>
+              <button class="logout-btn" @click="handleLogout" title="退出登录">
+                退出
+              </button>
             </div>
           </div>
         </header>
@@ -309,5 +343,23 @@ const toggleFullscreen = () => {
 .fade-slide-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+.logout-btn {
+  margin-left: 8px;
+  padding: 4px 12px;
+  border: 1px solid var(--ui-border);
+  background: transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ui-text-sub);
+  transition: all 0.2s;
+}
+
+.logout-btn:hover {
+  background: rgba(0,0,0,0.05);
+  color: var(--ui-danger, #ff3b30);
+  border-color: var(--ui-danger, #ff3b30);
 }
 </style>

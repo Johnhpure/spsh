@@ -29,6 +29,7 @@ import { ref } from 'vue';
 import { storage } from 'wxt/storage';
 import { ElMessage } from 'element-plus';
 import { User, Lock } from '@element-plus/icons-vue';
+import { auditRecordAPI } from '@/utils/auditApi';
 
 const emit = defineEmits(['login-success']);
 
@@ -49,30 +50,23 @@ const handleLogin = async () => {
   error.value = '';
 
   try {
-    // Get API URL from storage or default
-    const storedApiUrl = await storage.getItem<string>('local:audit_api_url');
-    const apiUrl = storedApiUrl || 'http://localhost:3000/api';
-
-    const response = await fetch(`${apiUrl}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form.value)
+    const result = await auditRecordAPI.login({
+      username: form.value.username,
+      password: form.value.password
     });
 
-    const data = await response.json();
-
-    if (data.success) {
+    if (result.success && result.token) {
       // Save token and user info
-      await storage.setItem('local:auth_token', data.token);
-      await storage.setItem('local:user_info', data.user);
+      await storage.setItem('local:auth_token', result.token);
+      await storage.setItem('local:user_info', result.user);
       
       ElMessage.success('登录成功');
       emit('login-success');
     } else {
-      error.value = data.error || '登录失败';
+      error.value = result.error || '登录失败';
     }
   } catch (e) {
-    error.value = '连接服务器失败';
+    error.value = '连接服务器失败: ' + e;
   } finally {
     loading.value = false;
   }
