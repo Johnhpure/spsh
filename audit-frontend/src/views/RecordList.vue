@@ -162,6 +162,7 @@ import type { AuditRecord, PaginatedResult, QueryFilters } from '../services/api
 import { ElMessage } from 'element-plus';
 import FilterPanel from '../components/FilterPanel.vue';
 import ErrorState from '../components/ErrorState.vue';
+import { API_SERVER_URL } from '../config/api';
 
 const router = useRouter();
 
@@ -309,7 +310,7 @@ const syncExternalData = async () => {
   syncing.value = true;
   try {
     const token = localStorage.getItem('auth_token');
-    const response = await fetch('http://localhost:3000/api/proxy/external-audit-list', {
+    const response = await fetch(`${API_SERVER_URL}/api/proxy/external-audit-list`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }

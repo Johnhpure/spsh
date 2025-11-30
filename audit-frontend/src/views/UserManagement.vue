@@ -70,6 +70,7 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
+import { API_BASE_URL } from '../config/api';
 
 interface User {
   id: string;
@@ -95,7 +96,7 @@ const fetchUsers = async () => {
   loading.value = true;
   try {
     const token = localStorage.getItem('auth_token');
-    const response = await fetch('http://localhost:3000/api/users', {
+    const response = await fetch(`${API_BASE_URL}/users`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await response.json();
@@ -125,7 +126,7 @@ const handleEdit = (row: User) => {
 const handleDelete = async (row: User) => {
   try {
     const token = localStorage.getItem('auth_token');
-    const response = await fetch(`http://localhost:3000/api/users/${row.id}`, {
+    const response = await fetch(`${API_BASE_URL}/users/${row.id}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -155,8 +156,8 @@ const saveUser = async () => {
   try {
     const token = localStorage.getItem('auth_token');
     const url = isEditing.value 
-      ? `http://localhost:3000/api/users/${editingId.value}`
-      : 'http://localhost:3000/api/auth/register';
+      ? `${API_BASE_URL}/users/${editingId.value}`
+      : `${API_BASE_URL}/auth/register`;
     
     const method = isEditing.value ? 'PUT' : 'POST';
     

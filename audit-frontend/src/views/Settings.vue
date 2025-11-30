@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Lock, Key, Cpu } from '@element-plus/icons-vue';
+import { API_BASE_URL } from '../config/api';
 
 const loading = ref(false);
 const saving = ref(false);
@@ -16,7 +17,7 @@ const fetchSettings = async () => {
   loading.value = true;
   try {
     const token = localStorage.getItem('auth_token');
-    const response = await fetch('http://localhost:3000/api/settings', {
+    const response = await fetch(`${API_BASE_URL}/settings`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -42,7 +43,7 @@ const saveSettings = async () => {
   saving.value = true;
   try {
     const token = localStorage.getItem('auth_token');
-    const response = await fetch('http://localhost:3000/api/settings', {
+    const response = await fetch(`${API_BASE_URL}/settings`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

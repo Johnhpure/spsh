@@ -83,6 +83,7 @@
 import { ref, onMounted, reactive } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { auditRecordAPI, type AuditRecord } from '../services/api';
+import { API_SERVER_URL } from '../config/api';
 
 const tableData = ref<AuditRecord[]>([]);
 const loading = ref(false);
@@ -97,8 +98,6 @@ const loginForm = reactive({
   username: '',
   password: ''
 });
-
-const API_BASE = 'http://localhost:3000';
 
 const checkLogin = () => {
   const cookie = localStorage.getItem('pinhaopin_cookie');
@@ -117,7 +116,7 @@ const handlePinhaopinLogin = async () => {
 
   loginLoading.value = true;
   try {
-    const res = await fetch(`${API_BASE}/api/proxy/pinhaopin/login`, {
+    const res = await fetch(`${API_SERVER_URL}/api/proxy/pinhaopin/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(loginForm)
@@ -169,7 +168,7 @@ const handleApprove = async (row: AuditRecord) => {
     }
 
     // 1. Call External API
-    const res = await fetch(`${API_BASE}/api/proxy/pinhaopin/auditProduct`, {
+    const res = await fetch(`${API_SERVER_URL}/api/proxy/pinhaopin/auditProduct`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -205,7 +204,7 @@ const handleReject = async (row: AuditRecord) => {
     }
 
     // 1. Call External API
-    const res = await fetch(`${API_BASE}/api/proxy/pinhaopin/batchAuditProduct`, {
+    const res = await fetch(`${API_SERVER_URL}/api/proxy/pinhaopin/batchAuditProduct`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',

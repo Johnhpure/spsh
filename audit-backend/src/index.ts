@@ -14,7 +14,10 @@ import proxyRouter from './routes/proxy';
 import systemSettingsRouter from './routes/systemSettings';
 import manualAuditRouter from './routes/manualAuditRoutes';
 
-dotenv.config();
+// 根据环境加载对应的配置文件
+const env = process.env.NODE_ENV || 'development';
+dotenv.config({ path: `.env.${env}` });
+dotenv.config(); // 加载通用 .env 作为后备
 
 const app = express();
 const port = process.env.API_PORT || 3000;
