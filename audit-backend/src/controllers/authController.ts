@@ -7,12 +7,13 @@ import { UserRow } from '../models/user';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-it-in-production';
 
-export const login = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response): Promise<void> => {
     try {
         const { username, password } = req.body;
 
         if (!username || !password) {
-            return res.status(400).json({ success: false, error: 'Username and password are required' });
+            res.status(400).json({ success: false, error: 'Username and password are required' });
+            return;
         }
 
         const users = await databaseManager.query<UserRow[]>(
@@ -21,14 +22,16 @@ export const login = async (req: Request, res: Response) => {
         );
 
         if (users.length === 0) {
-            return res.status(401).json({ success: false, error: 'Invalid credentials' });
+            res.status(401).json({ success: false, error: 'Invalid credentials' });
+            return;
         }
 
         const user = users[0];
         const validPassword = await bcrypt.compare(password, user.password);
 
         if (!validPassword) {
-            return res.status(401).json({ success: false, error: 'Invalid credentials' });
+            res.status(401).json({ success: false, error: 'Invalid credentials' });
+            return;
         }
 
         const token = jwt.sign(
@@ -52,12 +55,13 @@ export const login = async (req: Request, res: Response) => {
     }
 };
 
-export const register = async (req: Request, res: Response) => {
+export const register = async (req: Request, res: Response): Promise<void> => {
     try {
         const { username, password, role = 'user' } = req.body;
 
         if (!username || !password) {
-            return res.status(400).json({ success: false, error: 'Username and password are required' });
+            res.status(400).json({ success: false, error: 'Username and password are required' });
+            return;
         }
 
         // Check if user exists
@@ -67,7 +71,8 @@ export const register = async (req: Request, res: Response) => {
         );
 
         if (existingUsers.length > 0) {
-            return res.status(400).json({ success: false, error: 'Username already exists' });
+            res.status(400).json({ success: false, error: 'Username already exists' });
+            return;
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -89,14 +94,15 @@ export const register = async (req: Request, res: Response) => {
     }
 };
 
-export const verify = async (req: Request, res: Response) => {
+export const verify = async (req: Request, res: Response): Promise<void> => {
     try {
         // Token is already verified by authenticateToken middleware
         // req.user is populated by the middleware
         const user = (req as any).user;
-        
+
         if (!user) {
-            return res.status(401).json({ success: false, error: 'Invalid token' });
+            res.status(401).json({ success: false, error: 'Invalid token' });
+            return;
         }
 
         res.json({

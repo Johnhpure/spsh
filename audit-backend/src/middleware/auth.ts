@@ -11,12 +11,13 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ success: false, error: 'Access denied. No token provided.' });
+    res.status(401).json({ success: false, error: 'Access denied. No token provided.' });
+    return;
   }
 
   try {
@@ -24,13 +25,14 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     req.user = decoded;
     next();
   } catch (error) {
-    return res.status(403).json({ success: false, error: 'Invalid token.' });
+    res.status(403).json({ success: false, error: 'Invalid token.' });
   }
 };
 
-export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
   if (req.user?.role !== 'admin') {
-    return res.status(403).json({ success: false, error: 'Access denied. Admin privileges required.' });
+    res.status(403).json({ success: false, error: 'Access denied. Admin privileges required.' });
+    return;
   }
   next();
 };

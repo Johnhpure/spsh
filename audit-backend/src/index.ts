@@ -12,6 +12,7 @@ import authRouter from './routes/auth';
 import usersRouter from './routes/users';
 import proxyRouter from './routes/proxy';
 import systemSettingsRouter from './routes/systemSettings';
+import manualAuditRouter from './routes/manualAuditRoutes';
 
 dotenv.config();
 
@@ -79,6 +80,7 @@ app.use('/api/users', usersRouter);
 app.use('/api/proxy', proxyRouter);
 app.use('/api/audit-records', auditRecordsRouter);
 app.use('/api/settings', systemSettingsRouter);
+app.use('/api/manual-audit', manualAuditRouter);
 
 // 注册错误处理中间件（必须在所有路由之后）
 app.use(errorHandler);

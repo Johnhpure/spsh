@@ -63,6 +63,12 @@ const handleLogout = () => {
               <span v-if="!collapsed" class="label">审核记录</span>
             </transition>
           </router-link>
+          <router-link to="/artificial-audit" class="nav-item" :class="{ active: route.path === '/artificial-audit' }">
+            <span class="icon">🛡️</span>
+            <transition name="fade">
+              <span v-if="!collapsed" class="label">人工终审</span>
+            </transition>
+          </router-link>
           <router-link to="/users" class="nav-item" :class="{ active: route.path === '/users' }">
             <span class="icon">👥</span>
             <transition name="fade">
@@ -95,7 +101,8 @@ const handleLogout = () => {
               (route.name === 'RecordList' ? '审核记录' : 
               (route.name === 'RecordDetail' ? '详情' : 
               (route.name === 'UserManagement' ? '用户管理' : 
-              (route.name === 'Settings' ? '系统设置' : '')))) 
+              (route.name === 'ArtificialAudit' ? '人工终审' : 
+              (route.name === 'Settings' ? '系统设置' : ''))))) 
             }}</h2>
           </div>
           <div class="header-right">

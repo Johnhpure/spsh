@@ -71,6 +71,7 @@
                   v-if="row.productImage"
                   :src="row.productImage"
                   :preview-src-list="[row.productImage]"
+                  :preview-teleported="true"
                   fit="cover"
                   class="product-thumbnail"
                   @click.stop
@@ -99,6 +100,13 @@
           <el-table-column prop="username" label="审核员" width="120">
             <template #default="{ row }">
               <span class="auditor-cell">{{ row.username || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="manualStatus" label="人工状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getManualStatusType(row.manualStatus)">
+                {{ getManualStatusLabel(row.manualStatus) }}
+              </el-tag>
             </template>
           </el-table-column>
           <el-table-column label="外部结果" width="120">
@@ -238,6 +246,24 @@ const getStageLabel = (stage: string) => {
     business_scope: '经营范围审核'
   };
   return labelMap[stage] || stage;
+};
+
+const getManualStatusLabel = (status?: string) => {
+  const map: Record<string, string> = {
+    pending: '待审核',
+    approved: '通过',
+    rejected: '拒绝'
+  };
+  return map[status || 'pending'] || status || '待审核';
+};
+
+const getManualStatusType = (status?: string) => {
+  const map: Record<string, string> = {
+    pending: 'info',
+    approved: 'success',
+    rejected: 'danger'
+  };
+  return map[status || 'pending'] || 'info';
 };
 
 const formatDateTime = (dateString: string) => {

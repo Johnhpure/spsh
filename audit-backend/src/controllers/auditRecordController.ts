@@ -30,6 +30,16 @@ class AuditRecordController {
         scopeResponse: req.body.scopeResponse,
         userId: req.body.userId,
         username: req.body.username,
+        manualStatus: req.body.manualStatus || 'pending',
+        price: req.body.price,
+        shopName: req.body.shopName,
+        shopId: req.body.shopId,
+        categoryName: req.body.categoryName,
+        categoryImage: req.body.categoryImage,
+        images: req.body.images,
+        auditReason: req.body.auditReason,
+        categoryAuditStatus: req.body.categoryAuditStatus,
+        categoryAuditReason: req.body.categoryAuditReason,
       };
 
       const createdRecord = await auditRecordService.create(recordData);
@@ -100,6 +110,10 @@ class AuditRecordController {
 
       if (req.query.username) {
         filters.username = req.query.username as string;
+      }
+
+      if (req.query.manualStatus) {
+        filters.manualStatus = req.query.manualStatus as string;
       }
 
       // 解析分页参数
@@ -200,6 +214,27 @@ class AuditRecordController {
 
       // 发送CSV内容
       res.status(200).send(csvContent);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 更新人工审核状态
+   */
+  async updateManualStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { status, reason } = req.body;
+
+      if (!['approved', 'rejected'].includes(status)) {
+        res.status(400).json({ success: false, error: 'Invalid status' });
+        return;
+      }
+
+      await auditRecordService.updateManualStatus(id, status, reason);
+
+      res.status(200).json({ success: true });
     } catch (error) {
       next(error);
     }

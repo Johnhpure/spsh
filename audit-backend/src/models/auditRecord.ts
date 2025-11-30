@@ -25,6 +25,17 @@ export interface AuditRecord {
   scopeResponse?: string;
   userId?: string;
   username?: string;
+  // Manual Audit Fields
+  manualStatus?: 'pending' | 'approved' | 'rejected';
+  price?: number;
+  shopName?: string;
+  shopId?: string;
+  categoryName?: string;
+  categoryImage?: string;
+  images?: string;
+  auditReason?: string;
+  categoryAuditStatus?: string;
+  categoryAuditReason?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -39,6 +50,7 @@ export interface QueryFilters {
   endDate?: Date;
   keyword?: string;
   username?: string;
+  manualStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 /**
@@ -103,6 +115,17 @@ export interface AuditRecordRow {
   scope_response?: string;
   user_id?: string;
   username?: string;
+  // Manual Audit Fields
+  manual_status?: 'pending' | 'approved' | 'rejected';
+  price?: number;
+  shop_name?: string;
+  shop_id?: string;
+  category_name?: string;
+  category_image?: string;
+  images?: string;
+  audit_reason?: string;
+  category_audit_status?: string;
+  category_audit_reason?: string;
   created_at: Date;
   updated_at: Date;
 }

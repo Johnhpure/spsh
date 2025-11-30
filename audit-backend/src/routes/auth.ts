@@ -16,7 +16,7 @@ import { UserRow } from '../models/user';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 
-router.post('/setup-admin', async (req, res) => {
+router.post('/setup-admin', async (req, res): Promise<any> => {
     try {
         const users = await databaseManager.query<UserRow[]>('SELECT count(*) as count FROM users');
         if ((users[0] as any).count > 0) {

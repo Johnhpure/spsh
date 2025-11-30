@@ -1,34 +1,8 @@
-import dotenv from 'dotenv';
-import axios from 'axios';
 import { databaseManager } from './utils/database';
+import { systemSettingService } from './services/systemSettingService';
+import dotenv from 'dotenv';
 
 dotenv.config();
-
-const API_URL = 'http://localhost:3000/api';
-let AUTH_TOKEN = '';
-
-async function login() {
-    try {
-        // Assuming there is an admin user, or we can use the setup-admin endpoint if needed
-        // For this test, I'll try to login with a known user or create one if possible.
-        // Since I don't have the password for 'admin', I might need to insert a temporary user or just test the service layer directly if API auth is blocking.
-        // However, to test the API properly, I need a token.
-
-        // Let's try to use the service layer directly for verification to avoid auth issues in this script, 
-        // OR we can mock the auth middleware if we were running unit tests.
-        // But since this is a live integration test, I need a token.
-
-        // Alternative: I can test the Service layer directly, which proves the DB interaction works.
-        // Testing the API endpoints requires a running server and a valid token.
-
-        console.log('Skipping API login, testing Service layer directly...');
-        return;
-    } catch (error) {
-        console.error('Login failed:', error);
-    }
-}
-
-import { systemSettingService } from './services/systemSettingService';
 
 async function verifySettingsService() {
     try {

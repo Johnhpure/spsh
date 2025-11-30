@@ -28,6 +28,7 @@
                 v-if="record.productImage"
                 :src="record.productImage"
                 :preview-src-list="[record.productImage]"
+                :preview-teleported="true"
                 fit="cover"
                 class="product-image"
               >
@@ -49,6 +50,18 @@
                 <span class="label">商品标题</span>
                 <span class="value">{{ record.productTitle }}</span>
               </div>
+              <div class="detail-item">
+                <span class="label">价格</span>
+                <span class="value">¥{{ record.price }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">店铺</span>
+                <span class="value">{{ record.shopName }} (ID: {{ record.shopId }})</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">分类</span>
+                <span class="value">{{ record.categoryName }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -69,8 +82,28 @@
               </span>
             </div>
             <div class="detail-item">
+              <span class="label">人工审核状态</span>
+              <span class="value">
+                <el-tag :type="getManualStatusType(record.manualStatus)">
+                  {{ getManualStatusLabel(record.manualStatus) }}
+                </el-tag>
+              </span>
+            </div>
+            <div class="detail-item" v-if="record.categoryAuditStatus">
+              <span class="label">分类审核状态</span>
+              <span class="value">{{ record.categoryAuditStatus }}</span>
+            </div>
+            <div class="detail-item" v-if="record.categoryAuditReason">
+              <span class="label">分类审核原因</span>
+              <span class="value reason-text">{{ record.categoryAuditReason }}</span>
+            </div>
+            <div class="detail-item">
               <span class="label">失败原因</span>
               <span class="value reason-text">{{ record.rejectionReason }}</span>
+            </div>
+            <div class="detail-item" v-if="record.auditReason">
+              <span class="label">详细审核原因</span>
+              <span class="value reason-text">{{ record.auditReason }}</span>
             </div>
             <div class="detail-item">
               <span class="label">提交时间</span>
@@ -235,6 +268,24 @@ const getStageLabel = (stage: string) => {
   return labelMap[stage] || stage;
 };
 
+const getManualStatusLabel = (status?: string) => {
+  const map: Record<string, string> = {
+    pending: '待审核',
+    approved: '通过',
+    rejected: '拒绝'
+  };
+  return map[status || 'pending'] || status || '待审核';
+};
+
+const getManualStatusType = (status?: string) => {
+  const map: Record<string, string> = {
+    pending: 'info',
+    approved: 'success',
+    rejected: 'danger'
+  };
+  return map[status || 'pending'] || 'info';
+};
+
 const formatDateTime = (dateString: string) => {
   const date = new Date(dateString);
   return date.toLocaleString('zh-CN', {
@@ -326,7 +377,6 @@ onMounted(() => {
 }
 
 .product-image:hover {
-  transform: scale(1.02);
   box-shadow: var(--ui-shadow-hover);
 }
 

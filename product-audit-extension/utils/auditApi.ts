@@ -18,6 +18,17 @@ export interface AuditRecord {
   scopeResponse?: string;
   userId?: string;
   username?: string;
+  // Manual Audit Fields
+  manualStatus?: 'pending' | 'approved' | 'rejected';
+  price?: number;
+  shopName?: string;
+  shopId?: string;
+  categoryName?: string;
+  categoryImage?: string;
+  images?: string;
+  auditReason?: string;
+  categoryAuditStatus?: string;
+  categoryAuditReason?: string;
 }
 
 export interface ApiConfig {
@@ -187,6 +198,19 @@ class AuditApiClient {
     console.log(`[AuditAPI] Exists? ${exists}`);
 
     return exists;
+  }
+
+  async addManualAuditProduct(product: any): Promise<{ success: boolean; error?: string }> {
+    try {
+      const result = await this.request('/manual-audit/add', {
+        method: 'POST',
+        body: JSON.stringify(product)
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[AuditAPI] Failed to add manual audit product:', error);
+      return { success: false, error: String(error) };
+    }
   }
 }
 

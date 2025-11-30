@@ -52,6 +52,16 @@ const createRecordSchema = {
     scopeResponse: Joi.string().optional().allow(''),
     userId: Joi.string().optional().allow(''),
     username: Joi.string().optional().allow(''),
+    manualStatus: Joi.string().valid('pending', 'approved', 'rejected').optional().allow(null),
+    price: Joi.number().optional().allow(null),
+    shopName: Joi.string().optional().allow('', null),
+    shopId: Joi.string().optional().allow('', null),
+    categoryName: Joi.string().optional().allow('', null),
+    categoryImage: Joi.string().optional().allow('', null),
+    images: Joi.string().optional().allow('', null),
+    auditReason: Joi.string().optional().allow('', null),
+    categoryAuditStatus: Joi.string().optional().allow('', null),
+    categoryAuditReason: Joi.string().optional().allow('', null),
   }),
 };
 
@@ -85,6 +95,7 @@ const getRecordsSchema = {
       'number.max': 'limit must be at most 100',
     }),
     username: Joi.string().optional(),
+    manualStatus: Joi.string().valid('pending', 'approved', 'rejected').optional(),
   }),
 };
 
@@ -150,6 +161,17 @@ router.get(
   '/:id',
   authenticateToken,
   auditRecordController.getRecordById.bind(auditRecordController)
+);
+
+/**
+ * PATCH /api/audit-records/:id/manual-status
+ * 更新人工审核状态
+ * 应用auth中间件
+ */
+router.patch(
+  '/:id/manual-status',
+  authenticateToken,
+  auditRecordController.updateManualStatus.bind(auditRecordController)
 );
 
 /**

@@ -28,8 +28,10 @@ class AuditRecordService {
         id, product_id, product_title, product_image, submit_time,
         ai_processing_time, rejection_reason, audit_stage, api_error,
         text_request, text_response, image_request, image_response,
-        scope_request, scope_response, user_id, username
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        scope_request, scope_response, user_id, username,
+        manual_status, price, shop_name, shop_id, category_name, category_image, images, audit_reason,
+        category_audit_status, category_audit_reason
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -50,6 +52,16 @@ class AuditRecordService {
       record.scopeResponse || null,
       record.userId || null,
       record.username || null,
+      record.manualStatus || null,
+      record.price || null,
+      record.shopName || null,
+      record.shopId || null,
+      record.categoryName || null,
+      record.categoryImage || null,
+      record.images || null,
+      record.auditReason || null,
+      record.categoryAuditStatus || null,
+      record.categoryAuditReason || null
     ];
 
     await databaseManager.query<ResultSetHeader>(sql, params);
@@ -119,6 +131,11 @@ class AuditRecordService {
     if (filters.username) {
       whereClauses.push('username LIKE ?');
       params.push(`%${filters.username}%`);
+    }
+
+    if (filters.manualStatus) {
+      whereClauses.push('manual_status = ?');
+      params.push(filters.manualStatus);
     }
 
     const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -312,6 +329,26 @@ class AuditRecordService {
   }
 
   /**
+   * 更新人工审核状态
+   */
+  async updateManualStatus(id: string, status: 'approved' | 'rejected', reason?: string): Promise<AuditRecord | null> {
+    const sql = 'UPDATE audit_records SET manual_status = ?, rejection_reason = COALESCE(?, rejection_reason) WHERE id = ?';
+    await databaseManager.query(sql, [status, reason || null, id]);
+
+    this.clearStatisticsCache();
+    return this.findById(id);
+  }
+
+  /**
+   * 根据 Product ID 更新人工审核状态
+   */
+  async updateManualStatusByProductId(productId: string, status: 'approved' | 'rejected', reason?: string): Promise<void> {
+    const sql = 'UPDATE audit_records SET manual_status = ?, rejection_reason = COALESCE(?, rejection_reason) WHERE product_id = ?';
+    await databaseManager.query(sql, [status, reason || null, productId]);
+    this.clearStatisticsCache();
+  }
+
+  /**
    * 将数据库行映射为AuditRecord对象
    */
   private mapRowToRecord(row: AuditRecordRow): AuditRecord {
@@ -333,6 +370,16 @@ class AuditRecordService {
       scopeResponse: row.scope_response || undefined,
       userId: row.user_id || undefined,
       username: row.username || undefined,
+      manualStatus: row.manual_status || undefined,
+      price: row.price || undefined,
+      shopName: row.shop_name || undefined,
+      shopId: row.shop_id || undefined,
+      categoryName: row.category_name || undefined,
+      categoryImage: row.category_image || undefined,
+      images: row.images || undefined,
+      auditReason: row.audit_reason || undefined,
+      categoryAuditStatus: row.category_audit_status || undefined,
+      categoryAuditReason: row.category_audit_reason || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

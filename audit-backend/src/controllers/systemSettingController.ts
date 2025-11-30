@@ -6,7 +6,7 @@ class SystemSettingController {
     /**
      * 获取系统设置
      */
-    async getSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
+    async getSettings(_req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const settings = await systemSettingService.getSettings();
             res.status(200).json({

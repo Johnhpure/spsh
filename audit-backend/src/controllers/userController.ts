@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import databaseManager from '../utils/database';
 import { UserRow } from '../models/user';
 
-export const getAllUsers = async (req: Request, res: Response) => {
+export const getAllUsers = async (_req: Request, res: Response) => {
     try {
         const users = await databaseManager.query<UserRow[]>(
             'SELECT id, username, role, created_at FROM users ORDER BY created_at DESC'

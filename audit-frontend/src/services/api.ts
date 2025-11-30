@@ -21,6 +21,17 @@ export interface AuditRecord {
   createdAt: string;
   updatedAt?: string;
   username?: string;
+  // New fields
+  manualStatus?: 'pending' | 'approved' | 'rejected';
+  price?: number;
+  shopName?: string;
+  shopId?: string;
+  categoryName?: string;
+  categoryImage?: string;
+  images?: string;
+  auditReason?: string;
+  categoryAuditStatus?: string;
+  categoryAuditReason?: string;
 }
 
 export interface QueryFilters {
@@ -30,6 +41,7 @@ export interface QueryFilters {
   endDate?: string;
   keyword?: string;
   username?: string;
+  manualStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 export interface Pagination {
@@ -134,6 +146,17 @@ class AuditRecordAPI {
       }
     );
     return response.data;
+  }
+
+  /**
+   * 更新人工审核状态
+   */
+  async updateManualStatus(id: string, status: 'approved' | 'rejected', reason?: string): Promise<AuditRecord> {
+    const response: AxiosResponse<ApiResponse<AuditRecord>> = await axiosInstance.patch(
+      `/audit-records/${id}/manual-status`,
+      { status, reason }
+    );
+    return response.data.data;
   }
 }
 

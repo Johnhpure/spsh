@@ -4,6 +4,7 @@ import RecordList from '../views/RecordList.vue';
 import RecordDetail from '../views/RecordDetail.vue';
 import Login from '../views/Login.vue';
 import UserManagement from '../views/UserManagement.vue';
+import ArtificialAudit from '../views/ArtificialAudit.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -42,6 +43,11 @@ const router = createRouter({
       path: '/settings',
       name: 'Settings',
       component: () => import('../views/Settings.vue')
+    },
+    {
+      path: '/artificial-audit',
+      name: 'ArtificialAudit',
+      component: ArtificialAudit
     }
   ]
 });

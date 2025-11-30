@@ -39,6 +39,8 @@ const isLoggedIn = ref(false);
 const loginForm = ref({ username: '', password: '' });
 const loginLoading = ref(false);
 const loginError = ref('');
+const isImageViewerOpen = ref(false);
+let observer: MutationObserver | null = null;
 
 
 
@@ -112,7 +114,27 @@ onMounted(async () => {
     if (storedDarkMode !== null) {
         isDarkMode.value = storedDarkMode;
     }
+
+    // Auto-hide when image viewer is open
+    const checkImageViewer = () => {
+      const viewer = document.querySelector('.el-image-viewer__wrapper');
+      isImageViewerOpen.value = !!viewer && getComputedStyle(viewer).display !== 'none';
+    };
+
+    // Initial check
+    checkImageViewer();
+
+    // Watch for DOM changes
+    observer = new MutationObserver((mutations) => {
+      checkImageViewer();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true // Element Plus often appends to body, but sometimes nested
+    });
 });
+
 
 const handleLogin = async () => {
   if (!loginForm.value.username || !loginForm.value.password) {
@@ -174,13 +196,16 @@ const handleLogout = async () => {
 onUnmounted(() => {
   document.removeEventListener('mousemove', onDrag);
   document.removeEventListener('mouseup', stopDrag);
+  if (observer) {
+    observer.disconnect();
+  }
 });
 </script>
 
 <template>
   <div 
     class="control-panel" 
-    :class="{ minimized: isMinimized, 'dark-mode': isDarkMode }"
+    :class="{ minimized: isMinimized, 'dark-mode': isDarkMode, 'hidden-by-viewer': isImageViewerOpen }"
     ref="panelRef"
     :style="{ left: position.x + 'px', top: position.y + 'px' }"
   >
@@ -460,8 +485,13 @@ onUnmounted(() => {
   flex-direction: column;
   overflow: hidden;
   font-family: 'Inter', sans-serif;
-  z-index: 9999;
-  transition: height 0.3s, width 0.3s;
+  z-index: 1000;
+  transition: height 0.3s, width 0.3s, opacity 0.3s, visibility 0.3s;
+}
+.control-panel.hidden-by-viewer {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 .control-panel.minimized {
   width: 60px;

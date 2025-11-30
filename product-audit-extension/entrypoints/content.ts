@@ -270,7 +270,7 @@ function createUi(ctx: any) {
               processedCount++;
               auditState.stats.processed++;
 
-              let { id, name, description, mainImage, images, categoryName, shopId } = product;
+              let { id, name, description, mainImage, images, categoryName, shopId, categoryAuditStatus, categoryAuditReason } = product;
 
               // Check if already rejected in history (runtime memory only)
               const isAlreadyRejected = history.some(h => h.id === String(id) && h.status === 'rejected');
@@ -485,11 +485,22 @@ function createUi(ctx: any) {
                     scopeRequest: auditState.scopeRequest,
                     scopeResponse: auditState.scopeResponse,
                     userId: userInfo?.id,
-                    username: userInfo?.username
+                    username: userInfo?.username,
+                    // Manual Audit Fields
+                    manualStatus: 'pending',
+                    price: (product as any).price || 0,
+                    shopName: (product as any).shopName || '',
+                    shopId: String(shopId || ''),
+                    categoryName: categoryName || '',
+                    categoryImage: '',
+                    images: images || '',
+                    auditReason: rejectReason,
+                    categoryAuditStatus: categoryAuditStatus || '',
+                    categoryAuditReason: categoryAuditReason || ''
                   });
 
                   if (apiResult.success) {
-                    log(`ID ${id}: 审核记录已成功发送到后端`);
+                    log(`ID ${id}: 审核记录已成功发送到后端 (含人工审核信息)`);
                   } else {
                     log(`ID ${id}: 发送审核记录失败: ${apiResult.error}`);
                   }
