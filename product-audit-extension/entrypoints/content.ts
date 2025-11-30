@@ -267,6 +267,9 @@ function createUi(ctx: any) {
             for (const product of products) {
               if (!isRunning.value) break;
 
+              processedCount++;
+              auditState.stats.processed++;
+
               let { id, name, description, mainImage, images, categoryName, shopId } = product;
 
               // Check if already rejected in history (runtime memory only)
@@ -510,9 +513,6 @@ function createUi(ctx: any) {
 
                 await handleApprove(id);
               }
-
-              processedCount++;
-              auditState.stats.processed++;
 
               await new Promise(r => setTimeout(r, 1000));
             }
