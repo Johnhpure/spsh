@@ -84,6 +84,7 @@ const getRecordsSchema = {
       'number.min': 'limit must be at least 1',
       'number.max': 'limit must be at most 100',
     }),
+    username: Joi.string().optional(),
   }),
 };
 

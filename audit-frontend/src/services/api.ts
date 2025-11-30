@@ -20,6 +20,7 @@ export interface AuditRecord {
   scopeResponse?: string;
   createdAt: string;
   updatedAt?: string;
+  username?: string;
 }
 
 export interface QueryFilters {
@@ -28,6 +29,7 @@ export interface QueryFilters {
   startDate?: string;
   endDate?: string;
   keyword?: string;
+  username?: string;
 }
 
 export interface Pagination {
@@ -49,6 +51,7 @@ export interface Statistics {
   totalFailures: number;
   byStage: Record<string, number>;
   byReason: Record<string, number>;
+  byAuditor: Record<string, number>;
   trend: Array<{ date: string; count: number }>;
   avgProcessingTime: number;
 }
@@ -84,7 +87,7 @@ class AuditRecordAPI {
       ...filters,
       ...pagination
     };
-    
+
     const response: AxiosResponse<ApiResponse<PaginatedResult<AuditRecord>>> = await axiosInstance.get(
       '/audit-records',
       { params }
@@ -109,7 +112,7 @@ class AuditRecordAPI {
     const params: any = {};
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
-    
+
     const response: AxiosResponse<ApiResponse<Statistics>> = await axiosInstance.get(
       '/audit-records/statistics',
       { params }
@@ -122,7 +125,7 @@ class AuditRecordAPI {
    */
   async exportRecords(filters?: QueryFilters): Promise<Blob> {
     const params = { ...filters, format: 'csv' };
-    
+
     const response: AxiosResponse<Blob> = await axiosInstance.get(
       '/audit-records/export',
       {

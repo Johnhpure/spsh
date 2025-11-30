@@ -38,6 +38,7 @@ export interface QueryFilters {
   startDate?: Date;
   endDate?: Date;
   keyword?: string;
+  username?: string;
 }
 
 /**
@@ -76,6 +77,7 @@ export interface Statistics {
   totalFailures: number;
   byStage: Record<string, number>;
   byReason: Record<string, number>;
+  byAuditor: Record<string, number>;
   trend: Array<{ date: string; count: number }>;
   avgProcessingTime: number;
 }

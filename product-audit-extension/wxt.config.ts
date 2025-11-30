@@ -17,7 +17,7 @@ export default defineConfig({
         server: {
             port: 3002,
             hostname: 'localhost',
-            https: true,
+            // https: true, // Not supported in this type definition
         }
     }
 });

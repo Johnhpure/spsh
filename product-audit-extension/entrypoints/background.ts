@@ -4,11 +4,12 @@ export default defineBackground(() => {
     console.log('Background loaded');
 
     // Listen for API requests from content scripts to avoid Mixed Content issues
-    browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
         if (message.type === 'API_REQUEST') {
             handleApiRequest(message.payload).then(sendResponse);
             return true; // Indicates async response
         }
+        return false;
     });
 });
 

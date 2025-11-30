@@ -98,6 +98,10 @@ class AuditRecordController {
         filters.keyword = req.query.keyword as string;
       }
 
+      if (req.query.username) {
+        filters.username = req.query.username as string;
+      }
+
       // 解析分页参数
       const pagination = {
         page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
@@ -171,6 +175,10 @@ class AuditRecordController {
 
       if (req.query.keyword) {
         filters.keyword = req.query.keyword as string;
+      }
+
+      if (req.query.username) {
+        filters.username = req.query.username as string;
       }
 
       // 获取所有匹配记录（不分页）

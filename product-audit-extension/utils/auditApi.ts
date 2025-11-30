@@ -20,7 +20,7 @@ export interface AuditRecord {
   username?: string;
 }
 
-interface ApiConfig {
+export interface ApiConfig {
   url: string;
   key?: string;
 }
@@ -63,12 +63,16 @@ class AuditApiClient {
       }) as { success: boolean; data?: any; error?: string };
 
       if (!response.success) {
-        throw new Error(response.error || 'Unknown background error');
+        throw new Error(`${response.error || 'Unknown background error'} (URL: ${url})`);
       }
 
       return response.data;
     } catch (e) {
       console.error(`[AuditAPI] Request to ${endpoint} failed:`, e);
+      const msg = String(e);
+      if (!msg.includes(url)) {
+        throw new Error(`${msg} (URL: ${url})`);
+      }
       throw e;
     }
   }
@@ -167,6 +171,22 @@ class AuditApiClient {
     } catch (error) {
       return { success: false, error: String(error) };
     }
+  }
+
+  async checkProductExists(productId: string): Promise<boolean> {
+    const url = `/audit-records?productId=${productId}&limit=1`;
+    console.log(`[AuditAPI] Checking existence for ${productId} via ${url}`);
+
+    const result = await this.request(url, {
+      method: 'GET'
+    });
+
+    console.log(`[AuditAPI] Check result for ${productId}:`, JSON.stringify(result));
+
+    const exists = result.success && result.data && result.data.records && result.data.records.length > 0;
+    console.log(`[AuditAPI] Exists? ${exists}`);
+
+    return exists;
   }
 }
 

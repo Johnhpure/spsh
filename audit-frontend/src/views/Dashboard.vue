@@ -69,6 +69,12 @@
             <div class="card-header">失败原因排行榜</div>
             <div ref="reasonChartRef" class="chart chart-large" v-loading="chartLoading"></div>
           </div>
+
+          <!-- Auditor Chart -->
+          <div class="chart-card full-width">
+            <div class="card-header">审核员审核数量排行</div>
+            <div ref="auditorChartRef" class="chart chart-large" v-loading="chartLoading"></div>
+          </div>
         </div>
       </div>
     </template>
@@ -76,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { auditRecordAPI } from '../services/api';
 import type { Statistics } from '../services/api';
 import * as echarts from 'echarts';
@@ -94,11 +100,13 @@ const statistics = ref<Statistics | null>(null);
 const trendChartRef = ref<HTMLElement | null>(null);
 const stageChartRef = ref<HTMLElement | null>(null);
 const reasonChartRef = ref<HTMLElement | null>(null);
+const auditorChartRef = ref<HTMLElement | null>(null);
 
 // ECharts Instances
 let trendChart: ECharts | null = null;
 let stageChart: ECharts | null = null;
 let reasonChart: ECharts | null = null;
+let auditorChart: ECharts | null = null;
 
 // Stage Labels
 const stageLabels: Record<string, string> = {
@@ -118,7 +126,9 @@ const loadStatistics = async () => {
     
     statistics.value = await auditRecordAPI.getStatistics(startDate, endDate);
     
-    // Render Charts
+    // Wait for DOM update then init and render charts
+    await nextTick();
+    initCharts();
     renderCharts();
   } catch (err: any) {
     error.value = true;
@@ -143,14 +153,17 @@ const formatProcessingTime = (ms: number): string => {
 
 // Init Charts
 const initCharts = () => {
-  if (trendChartRef.value) {
+  if (trendChartRef.value && !trendChart) {
     trendChart = echarts.init(trendChartRef.value);
   }
-  if (stageChartRef.value) {
+  if (stageChartRef.value && !stageChart) {
     stageChart = echarts.init(stageChartRef.value);
   }
-  if (reasonChartRef.value) {
+  if (reasonChartRef.value && !reasonChart) {
     reasonChart = echarts.init(reasonChartRef.value);
+  }
+  if (auditorChartRef.value && !auditorChart) {
+    auditorChart = echarts.init(auditorChartRef.value);
   }
 
   window.addEventListener('resize', handleResize);
@@ -163,6 +176,7 @@ const renderCharts = () => {
   renderTrendChart();
   renderStageChart();
   renderReasonChart();
+  renderAuditorChart();
 };
 
 // Render Trend Chart
@@ -328,10 +342,69 @@ const renderReasonChart = () => {
   reasonChart.setOption(option);
 };
 
+// Render Auditor Chart
+const renderAuditorChart = () => {
+  if (!auditorChart || !statistics.value) return;
+
+  const sortedAuditors = Object.entries(statistics.value.byAuditor)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  const auditors = sortedAuditors.map(item => item[0]);
+  const counts = sortedAuditors.map(item => item[1]);
+
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'shadow'
+      }
+    },
+    xAxis: {
+      type: 'category',
+      data: auditors,
+      axisLabel: {
+        interval: 0,
+        rotate: 45
+      }
+    },
+    yAxis: {
+      type: 'value',
+      name: '审核数量'
+    },
+    series: [
+      {
+        name: '审核数量',
+        type: 'bar',
+        data: counts,
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#34C759' },
+            { offset: 1, color: '#32ADE6' }
+          ])
+        },
+        label: {
+          show: true,
+          position: 'top'
+        }
+      }
+    ],
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '20%',
+      containLabel: true
+    }
+  };
+
+  auditorChart.setOption(option);
+};
+
 const handleResize = () => {
   trendChart?.resize();
   stageChart?.resize();
   reasonChart?.resize();
+  auditorChart?.resize();
 };
 
 onMounted(() => {
@@ -344,6 +417,7 @@ onUnmounted(() => {
   trendChart?.dispose();
   stageChart?.dispose();
   reasonChart?.dispose();
+  auditorChart?.dispose();
 });
 </script>
 

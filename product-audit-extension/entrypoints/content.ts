@@ -9,6 +9,8 @@ import { aliyunOcr } from '@/utils/aliyun_ocr';
 import { deepseek } from '@/utils/deepseek';
 import { getLabelDescription } from '@/utils/aliyun_labels';
 import { auditRecordAPI } from '@/utils/auditApi';
+import ElementPlus from 'element-plus';
+import 'element-plus/dist/index.css';
 import './overlay.css';
 
 export default defineContentScript({
@@ -84,7 +86,7 @@ function createUi(ctx: any) {
       };
 
       const log = (msg: string) => {
-        logs.value.push('[' + new Date().toLocaleTimeString() + '] ' + msg);
+        logs.value.unshift('[' + new Date().toLocaleTimeString() + '] ' + msg);
         console.log('[Audit] ' + msg);
       };
 
@@ -95,116 +97,154 @@ function createUi(ctx: any) {
         log('用户停止审核。');
       };
 
-      const fetchPendingProducts = async () => {
+      const fetchPendingProducts = async (pageNo: number = 0) => {
         try {
-          const res = await fetch('https://admin.pinhaopin.com/gateway/mall/listAllProducts?pageNumber=0&pageSize=200&status=pending&sortField=pendingTime&sortOrder=asc');
-          const data = await res.json();
-          return data.data?.content || [];
-        } catch (e) {
-          log('API Fetch Error: ' + e);
-          return [];
-        }
-      };
-
-      const handleApprove = async (row: Element, id: string) => {
-        const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
-        const approveBtn = Array.from(buttons).find(b => {
-          const text = b.textContent?.replace(/\s/g, '') || '';
-          return text.includes('通过') || text.includes('批准');
-        });
-
-        if (approveBtn) {
-          log('ID ' + id + ': 点击批准按钮');
-          (approveBtn as HTMLElement).click();
-
-          // Wait for modal to appear
-          let modalContent: Element | null = null;
-          for (let i = 0; i < 10; i++) {
-            await new Promise(r => setTimeout(r, 200));
-            modalContent = document.querySelector('.ant-modal-content');
-            if (modalContent) break;
-          }
-
-          if (modalContent) {
-            log('ID ' + id + ': 找到确认弹窗');
-            const footerBtns = modalContent.querySelectorAll('.ant-modal-footer button, .ant-modal-footer .ant-btn');
-            const confirmBtn = Array.from(footerBtns).find(b => {
-              const text = b.textContent?.replace(/\s/g, '') || '';
-              return text.includes('确认') || text.includes('批准') || b.classList.contains('ant-btn-primary');
-            });
-
-            if (confirmBtn) {
-              log('ID ' + id + ': 点击弹窗确认按钮');
-              (confirmBtn as HTMLElement).click();
-            } else {
-              log('ID ' + id + ': 未在弹窗中找到确认按钮');
-            }
-          } else {
-            // Fallback for old behavior or if modal doesn't appear
-            log('ID ' + id + ': 未检测到弹窗，尝试查找通用确认按钮');
-            const confirmBtn = document.querySelector(
-              '.el-message-box__btns .el-button--primary, .ant-modal-confirm-btns .ant-btn-primary'
-            );
-            if (confirmBtn) {
-              (confirmBtn as HTMLElement).click();
-            }
-          }
-        } else {
-          log('ID ' + id + ': 未找到批准按钮');
-        }
-      };
-
-      const handleReject = async (row: Element, id: string) => {
-        const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
-        const rejectBtn = Array.from(buttons).find(b => {
-          const text = b.textContent?.replace(/\s/g, '') || '';
-          return text.includes('拒绝') || text.includes('驳回');
-        });
-
-        if (rejectBtn) {
-          log('ID ' + id + ': 点击拒绝按钮');
-          (rejectBtn as HTMLElement).click();
-
-          // Wait for dialog and find textarea with retries
-          let reasonInput: HTMLTextAreaElement | null = null;
-          for (let i = 0; i < 5; i++) {
-            await new Promise(r => setTimeout(r, 500));
-            reasonInput = document.querySelector('.el-textarea__inner, textarea, .ant-input') as HTMLTextAreaElement;
-            if (reasonInput && reasonInput.offsetParent !== null) break; // Ensure it's visible
-          }
-
-          if (reasonInput) {
-            log('ID ' + id + ': 找到拒绝原因输入框');
-
-            // Robust React 16+ hack
-            const proto = Object.getPrototypeOf(reasonInput);
-            const valueProp = Object.getOwnPropertyDescriptor(proto, "value") || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value") || Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
-
-            if (valueProp && valueProp.set) {
-              valueProp.set.call(reasonInput, '商品内容违规');
-            } else {
-              reasonInput.value = '商品内容违规';
-            }
-
-            reasonInput.dispatchEvent(new Event('input', { bubbles: true }));
-            reasonInput.dispatchEvent(new Event('change', { bubbles: true }));
-            reasonInput.dispatchEvent(new Event('blur', { bubbles: true }));
-          } else {
-            log('ID ' + id + ': 未找到拒绝原因输入框');
-          }
-
-          const confirmBtn = document.querySelector(
-            '.el-dialog__footer .el-button--primary, .el-message-box__btns .el-button--primary, .ant-modal-footer .ant-btn-primary'
+          const params = {
+            pageNumber: String(pageNo),
+            pageSize: "20",
+            status: "pending",
+          };
+          const res = await fetch(
+            "https://admin.pinhaopin.com/gateway/mall/listAllProducts?" +
+            new URLSearchParams(params)
           );
-          if (confirmBtn) {
-            (confirmBtn as HTMLElement).click();
-          } else {
-            log('ID ' + id + ': 未找到确认按钮');
-          }
-        } else {
-          log('ID ' + id + ': 未找到拒绝按钮');
+          const data = await res.json();
+
+          return {
+            products: data?.data?.content || [],
+            total: data?.data?.total || 0,
+          };
+        } catch (e) {
+          log("API Fetch Error: " + e);
+          return {
+            products: [],
+            total: 0,
+          };
         }
       };
+
+      const handleApprove = async (id: number) => {
+        try {
+          const res = await fetch(
+            "https://admin.pinhaopin.com/gateway/mall/auditProduct",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id, status: "online" }),
+            }
+          );
+
+          if (!res.ok) {
+            const errText = await res.text();
+            log(`ID ${id}: 接口调用失败 ${res.status} - ${errText}`);
+            return;
+          }
+
+          log(`ID ${id}: 审核已提交`);
+        } catch (e) {
+          log(`ID ${id}: 接口调用异常 - ${e}`);
+        }
+      };
+
+      // const handleApprove = async (row: Element, id: string) => {
+      //   const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
+      //   const approveBtn = Array.from(buttons).find(b => {
+      //     const text = b.textContent?.replace(/\s/g, '') || '';
+      //     return text.includes('通过') || text.includes('批准');
+      //   });
+
+      //   if (approveBtn) {
+      //     log('ID ' + id + ': 点击批准按钮');
+      //     (approveBtn as HTMLElement).click();
+
+      //     // Wait for modal to appear
+      //     let modalContent: Element | null = null;
+      //     for (let i = 0; i < 10; i++) {
+      //       await new Promise(r => setTimeout(r, 200));
+      //       modalContent = document.querySelector('.ant-modal-content');
+      //       if (modalContent) break;
+      //     }
+
+      //     if (modalContent) {
+      //       log('ID ' + id + ': 找到确认弹窗');
+      //       const footerBtns = modalContent.querySelectorAll('.ant-modal-footer button, .ant-modal-footer .ant-btn');
+      //       const confirmBtn = Array.from(footerBtns).find(b => {
+      //         const text = b.textContent?.replace(/\s/g, '') || '';
+      //         return text.includes('确认') || text.includes('批准') || b.classList.contains('ant-btn-primary');
+      //       });
+
+      //       if (confirmBtn) {
+      //         log('ID ' + id + ': 点击弹窗确认按钮');
+      //         (confirmBtn as HTMLElement).click();
+      //       } else {
+      //         log('ID ' + id + ': 未在弹窗中找到确认按钮');
+      //       }
+      //     } else {
+      //       // Fallback for old behavior or if modal doesn't appear
+      //       log('ID ' + id + ': 未检测到弹窗，尝试查找通用确认按钮');
+      //       const confirmBtn = document.querySelector(
+      //         '.el-message-box__btns .el-button--primary, .ant-modal-confirm-btns .ant-btn-primary'
+      //       );
+      //       if (confirmBtn) {
+      //         (confirmBtn as HTMLElement).click();
+      //       }
+      //     }
+      //   } else {
+      //     log('ID ' + id + ': 未找到批准按钮');
+      //   }
+      // };
+
+      // const handleReject = async (row: Element, id: string) => {
+      //   const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
+      //   const rejectBtn = Array.from(buttons).find(b => {
+      //     const text = b.textContent?.replace(/\s/g, '') || '';
+      //     return text.includes('拒绝') || text.includes('驳回');
+      //   });
+
+      //   if (rejectBtn) {
+      //     log('ID ' + id + ': 点击拒绝按钮');
+      //     (rejectBtn as HTMLElement).click();
+
+      //     // Wait for dialog and find textarea with retries
+      //     let reasonInput: HTMLTextAreaElement | null = null;
+      //     for (let i = 0; i < 5; i++) {
+      //       await new Promise(r => setTimeout(r, 500));
+      //       reasonInput = document.querySelector('.el-textarea__inner, textarea, .ant-input') as HTMLTextAreaElement;
+      //       if (reasonInput && reasonInput.offsetParent !== null) break; // Ensure it's visible
+      //     }
+
+      //     if (reasonInput) {
+      //       log('ID ' + id + ': 找到拒绝原因输入框');
+
+      //       // Robust React 16+ hack
+      //       const proto = Object.getPrototypeOf(reasonInput);
+      //       const valueProp = Object.getOwnPropertyDescriptor(proto, "value") || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value") || Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
+
+      //       if (valueProp && valueProp.set) {
+      //         valueProp.set.call(reasonInput, '商品内容违规');
+      //       } else {
+      //         reasonInput.value = '商品内容违规';
+      //       }
+
+      //       reasonInput.dispatchEvent(new Event('input', { bubbles: true }));
+      //       reasonInput.dispatchEvent(new Event('change', { bubbles: true }));
+      //       reasonInput.dispatchEvent(new Event('blur', { bubbles: true }));
+      //     } else {
+      //       log('ID ' + id + ': 未找到拒绝原因输入框');
+      //     }
+
+      //     const confirmBtn = document.querySelector(
+      //       '.el-dialog__footer .el-button--primary, .el-message-box__btns .el-button--primary, .ant-modal-footer .ant-btn-primary'
+      //     );
+      //     if (confirmBtn) {
+      //       (confirmBtn as HTMLElement).click();
+      //     } else {
+      //       log('ID ' + id + ': 未找到确认按钮');
+      //     }
+      //   } else {
+      //     log('ID ' + id + ': 未找到拒绝按钮');
+      //   }
+      // };
 
       const startAudit = async () => {
         if (isRunning.value) return;
@@ -214,103 +254,66 @@ function createUi(ctx: any) {
         log('开始审核...');
 
         try {
+          let pageNo = 0;
           while (isRunning.value) {
             // Fetch pending products from API
-            const products = await fetchPendingProducts();
+            const { products, total } = await fetchPendingProducts(pageNo);
             log('API返回 ' + products.length + ' 个待审核商品');
 
-            auditState.stats.total = products.length; // Update total count
-
-            if (products.length === 0) {
-              log('未找到待审核项目。10分钟后自动刷新页面...');
-              auditState.product = null;
-              auditState.textRequest = '';
-              auditState.textResponse = '';
-              auditState.imageRequest = '';
-              auditState.imageResponse = '';
-              auditState.scopeRequest = '';
-              auditState.scopeResponse = '';
-              auditState.aiAnalysis = '';
-              auditState.result = null;
-
-              // Wait 10 minutes (600 seconds)
-              for (let i = 600; i > 0; i--) {
-                if (!isRunning.value) break;
-                if (i % 60 === 0) {
-                  log(`等待刷新: 还剩 ${i / 60} 分钟...`);
-                }
-                await new Promise(r => setTimeout(r, 1000));
-              }
-
-              if (isRunning.value) {
-                log('正在刷新页面...');
-                window.location.reload();
-                return; // Stop current execution as page will reload
-              }
-              continue;
-            }
+            auditState.stats.total = total; // Update total count
 
             let processedCount = 0;
 
             for (const product of products) {
               if (!isRunning.value) break;
 
-              let { id, name, description, mainImage, categoryName, shopId } = product;
+              let { id, name, description, mainImage, images, categoryName, shopId } = product;
 
-              // Check if already rejected in history
+              // Check if already rejected in history (runtime memory only)
               const isAlreadyRejected = history.some(h => h.id === String(id) && h.status === 'rejected');
               if (isAlreadyRejected) {
                 log(`ID ${id}: 已在拒绝历史中，跳过自动审核`);
                 continue;
               }
 
-              // Find the row in DOM by ID
-              const allSpans = Array.from(document.querySelectorAll('span'));
-              const idSpan = allSpans.find(s => s.textContent?.trim() === String(id));
-
-              if (!idSpan) {
-                log('ID ' + id + ': 未在页面找到对应行 (可能需翻页)');
-                continue;
+              // Check backend for existing record (Duplicate Check)
+              try {
+                const exists = await auditRecordAPI.checkProductExists(String(id));
+                if (exists) {
+                  log(`ID ${id}: 数据库查询结果：已存在 -> 跳过自动审核`);
+                  // Add to runtime history so it shows up in UI
+                  history.unshift({
+                    id: String(id),
+                    name: name,
+                    image: mainImage,
+                    status: 'passed',
+                    timestamp: Date.now()
+                  });
+                  continue;
+                } else {
+                  log(`ID ${id}: 数据库查询结果：未存在 -> 继续审核`);
+                }
+              } catch (err) {
+                console.error('Failed to check duplicate:', err);
+                log(`ID ${id}: 检查重复失败: ${err}`);
               }
 
-              const row = idSpan.closest('tr') || idSpan.closest('.el-table__row') || idSpan.closest('.ant-table-row');
-              if (!row) {
-                log('ID ' + id + ': 无法定位行元素');
-                continue;
-              }
-
-              // Collect all images
               const imagesToAudit: string[] = [];
 
-              // 1. From API (if available)
               if (mainImage) imagesToAudit.push(mainImage);
-              if (Array.isArray(product.slideImages)) imagesToAudit.push(...product.slideImages);
-              else if (Array.isArray(product.images)) imagesToAudit.push(...product.images);
-              else if (Array.isArray(product.gallery)) imagesToAudit.push(...product.gallery);
-              else if (typeof product.slideImages === 'string') {
-                imagesToAudit.push(...product.slideImages.split(',').filter((s: string) => s));
+              if (images) {
+                images
+                  .split(",")
+                  .map((s) => s.trim().replace(/^`|`$/g, ""))
+                  .filter((s) => s)
+                  .forEach((s) => imagesToAudit.push(s));
               }
-
-              // 2. From DOM (The most reliable source for what's visible)
-              const domImages = row.querySelectorAll('.ant-image-img');
-              domImages.forEach((img: Element) => {
-                const src = (img as HTMLImageElement).src;
-                if (src && !src.includes('data:image')) {
-                  imagesToAudit.push(src);
-                }
-              });
-
-              // Deduplicate and upgrade to HTTPS
-              const uniqueImages = [...new Set(imagesToAudit
-                .filter(url => url && url.startsWith('http'))
-                .map(url => url.replace(/^http:\/\//i, 'https://'))
-              )];
 
               // Update UI State
               auditState.product = {
                 id: String(id),
                 name: name,
-                image: uniqueImages[0] || mainImage
+                image: mainImage
               };
               auditState.textRequest = '';
               auditState.textResponse = '';
@@ -321,7 +324,7 @@ function createUi(ctx: any) {
               auditState.aiAnalysis = '';
               auditState.result = null;
 
-              log(`正在处理 ID: ${id}, 图片数: ${uniqueImages.length}...`);
+              log(`正在处理 ID: ${id}, 图片数: ${imagesToAudit.length}...`);
 
               // Track timing for API submission
               const auditStartTime = Date.now();
@@ -347,10 +350,10 @@ function createUi(ctx: any) {
                 log('ID ' + id + ': 结果 拒绝 (阿里云 - 文本违规) -> 跳过处理');
               } else {
                 // 2. Image Moderation (Multi-Image)
-                if (uniqueImages.length > 0) {
-                  for (let i = 0; i < uniqueImages.length; i++) {
-                    const imgUrl = uniqueImages[i];
-                    auditState.imageRequest = `[${i + 1}/${uniqueImages.length}] ${imgUrl}`;
+                if (imagesToAudit.length > 0) {
+                  for (let i = 0; i < imagesToAudit.length; i++) {
+                    const imgUrl = imagesToAudit[i];
+                    auditState.imageRequest = `[${i + 1}/${imagesToAudit.length}] ${imgUrl}`;
 
                     const imageResult = await aliyunGreen.imageModeration(imgUrl);
                     auditState.imageResponse = JSON.stringify(imageResult.response, null, 2);
@@ -374,7 +377,7 @@ function createUi(ctx: any) {
                       break; // Fail fast
                     }
 
-                    if (i < uniqueImages.length - 1) await new Promise(r => setTimeout(r, 500));
+                    if (i < imagesToAudit.length - 1) await new Promise(r => setTimeout(r, 500));
                   }
                 }
               }
@@ -383,18 +386,6 @@ function createUi(ctx: any) {
                 log(`ID ${id}: 开始经营范围审核...`);
                 if (!categoryName) {
                   log(`ID ${id}: 缺少商品分类信息，跳过经营范围审核`);
-                }
-
-                if (!shopId) {
-                  const cells = Array.from(row.querySelectorAll('td'));
-                  const numericCells = cells.map(c => c.textContent?.trim()).filter(t => t && /^\d+$/.test(t));
-                  const found = numericCells.find(n => n !== String(id));
-                  if (found) {
-                    shopId = found;
-                    log(`ID ${id}: 从DOM抓取到店铺ID: ${shopId}`);
-                  } else {
-                    log(`ID ${id}: 无法从DOM获取店铺ID`);
-                  }
                 }
 
                 if (!shopId) {
@@ -466,7 +457,7 @@ function createUi(ctx: any) {
                   reason: rejectReason,
                   timestamp: Date.now()
                 });
-                saveHistory();
+                // REMOVED: saveHistory();
 
                 const auditEndTime = Date.now();
                 const aiProcessingTime = auditEndTime - auditStartTime;
@@ -515,9 +506,9 @@ function createUi(ctx: any) {
                   status: 'passed',
                   timestamp: Date.now()
                 });
-                saveHistory();
+                // REMOVED: saveHistory();
 
-                await handleApprove(row, id);
+                await handleApprove(id);
               }
 
               processedCount++;
@@ -527,9 +518,10 @@ function createUi(ctx: any) {
             }
 
             if (processedCount === 0) {
-              log('本页未处理任何商品 (可能已处理或未找到DOM)。等待刷新...');
-              await new Promise(r => setTimeout(r, 5000));
+              throw new Error("没有商品可审核");
             }
+
+            pageNo++;
           }
         } catch (e) {
           log('错误: ' + e);
@@ -539,24 +531,6 @@ function createUi(ctx: any) {
         }
       };
 
-      const serverStats = ref<any>(null);
-
-      const fetchServerStatistics = async () => {
-        try {
-          const stats = await auditRecordAPI.getStatistics();
-          if (stats) {
-            serverStats.value = stats;
-            log('已更新服务器统计数据');
-          }
-        } catch (e) {
-          console.error('Failed to fetch server statistics', e);
-          log('获取服务器统计数据失败: ' + e);
-        }
-      };
-
-      // Initial fetch
-      fetchServerStatistics();
-
       const app = createApp({
         setup() {
           return () => h(ControlPanel, {
@@ -565,13 +539,13 @@ function createUi(ctx: any) {
             logs: logs.value,
             auditState: auditState,
             history: history,
-            serverStats: serverStats.value,
             onStart: startAudit,
-            onStop: stopAudit,
-            onRefreshStats: fetchServerStatistics
+            onStop: stopAudit
           });
         }
       });
+
+      app.use(ElementPlus);
 
       app.mount(container);
 

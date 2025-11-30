@@ -15,8 +15,10 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
     "@types/uuid": "^10.0.0",
     "ali-oss": "^6.23.0",
+    "element-plus": "^2.11.9",
     "uuid": "^13.0.0",
     "vue": "^3.5.21"
   },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { storage } from 'wxt/storage';
 import { auditRecordAPI } from '@/utils/auditApi';
 
@@ -27,27 +27,32 @@ const props = defineProps<{
     reason?: string;
     timestamp: number;
   }[];
-  serverStats: {
-    totalFailures: number;
-    byStage: Record<string, number>;
-    byReason: Record<string, number>;
-    trend: { date: string; count: number }[];
-    avgProcessingTime: number;
-  } | null;
+
 }>();
 
-const emit = defineEmits(['start', 'stop', 'refresh-stats']);
+const emit = defineEmits(['start', 'stop']);
 
 const isMinimized = ref(false);
-const activeTab = ref<'current' | 'passed' | 'rejected' | 'statistics'>('current');
+const activeTab = ref<'current' | 'passed' | 'rejected'>('current');
 const isDarkMode = ref(false);
 const isLoggedIn = ref(false);
 const loginForm = ref({ username: '', password: '' });
 const loginLoading = ref(false);
 const loginError = ref('');
 
+
+
 const passedHistory = computed(() => props.history.filter(h => h.status === 'passed'));
 const rejectedHistory = computed(() => props.history.filter(h => h.status === 'rejected'));
+
+const logsContainer = ref<HTMLElement | null>(null);
+
+watch(() => props.logs.length, async () => {
+  await nextTick();
+  if (logsContainer.value) {
+    logsContainer.value.scrollTop = 0;
+  }
+});
 
 const toggleMinimize = () => {
   isMinimized.value = !isMinimized.value;
@@ -164,6 +169,8 @@ const handleLogout = async () => {
   loginForm.value = { username: '', password: '' };
 };
 
+
+
 onUnmounted(() => {
   document.removeEventListener('mousemove', onDrag);
   document.removeEventListener('mouseup', stopDrag);
@@ -180,10 +187,11 @@ onUnmounted(() => {
     <!-- Header -->
     <div class="header" @mousedown="startDrag" v-if="!isMinimized">
       <div class="header-title">
-        <h3>商品审核助手</h3>
         <span class="status-dot" :class="isRunning ? 'running' : 'idle'"></span>
+        <h3>商品审核助手</h3>
       </div>
       <div class="header-controls">
+
         <button class="icon-btn theme-btn" @click="toggleTheme" :title="isDarkMode ? '切换亮色' : '切换暗色'">
           <span v-if="isDarkMode">☀️</span>
           <span v-else>🌙</span>
@@ -210,6 +218,9 @@ onUnmounted(() => {
         🛡️
       </div>
     </div>
+
+    <!-- Settings Overlay -->
+
 
     <!-- Main Content -->
     <div class="content" v-show="!isMinimized">
@@ -263,13 +274,7 @@ onUnmounted(() => {
           >
             拒绝记录 <span class="badge" v-if="rejectedHistory.length">{{ rejectedHistory.length }}</span>
           </button>
-          <button 
-            class="tab-btn" 
-            :class="{ active: activeTab === 'statistics' }"
-            @click="activeTab = 'statistics'"
-          >
-            统计
-          </button>
+
         </div>
       </div>
 
@@ -342,7 +347,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Logs -->
-            <div class="logs-container" v-if="logs.length > 0">
+            <div class="logs-container" v-if="logs.length > 0" ref="logsContainer">
                 <div class="log-entry" v-for="(log, index) in logs" :key="index">
                     <span class="log-time"></span>
                     <span class="log-text">{{ log }}</span>
@@ -410,53 +415,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Tab Content: Server Statistics -->
-      <div v-show="activeTab === 'statistics'" class="tab-pane">
-        <div v-if="!serverStats" class="loading-state">
-          <div>加载中...</div>
-        </div>
-        <div v-else class="server-stats-container">
-          <div class="stats-grid">
-            <div class="stat-card danger">
-              <span class="stat-label">总拒绝数</span>
-              <span class="stat-value">{{ serverStats.totalFailures }}</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">平均耗时</span>
-              <span class="stat-value">{{ serverStats.avgProcessingTime }}ms</span>
-            </div>
-          </div>
 
-          <div class="chart-section">
-            <h5>拒绝原因分布</h5>
-            <div class="reason-list">
-              <div v-for="(count, reason) in serverStats.byReason" :key="reason" class="reason-item">
-                <div class="reason-info">
-                  <span class="reason-name">{{ reason }}</span>
-                  <span class="reason-count">{{ count }}</span>
-                </div>
-                <div class="progress-bar">
-                  <div class="progress-fill" :style="{ width: (count / serverStats.totalFailures * 100) + '%' }"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="chart-section">
-            <h5>审核阶段分布</h5>
-            <div class="stage-grid">
-              <div v-for="(count, stage) in serverStats.byStage" :key="stage" class="stage-card">
-                <span class="stage-name">{{ stage }}</span>
-                <span class="stage-count">{{ count }}</span>
-              </div>
-            </div>
-          </div>
-          
-          <div class="actions-row">
-             <button class="action-btn secondary" @click="$emit('refresh-stats')">🔄 刷新数据</button>
-          </div>
-        </div>
-      </div>
 
       </div>
     </div>
@@ -472,14 +431,20 @@ onUnmounted(() => {
   --color-primary: #007aff;
   --color-danger: #ff3b30;
   --color-success: #34c759;
-  --color-bg-main: #ffffff;
-  --color-text-main: #333333;
-  --color-text-sub: #888888;
-  --color-card-bg: #f2f2f7;
-  --color-bg-secondary: #eeeeee;
-  --color-border: #d1d1d6;
-  --ui-btn-radius: 12px;
-  --ui-border-radius: 16px;
+  
+  /* Light Mode: Gray Canvas, White Cards */
+  --color-bg-main: #f5f7fa;
+  --color-text-main: #1d1d1f;
+  --color-text-sub: #86868b;
+  --color-card-bg: #ffffff;
+  --color-bg-secondary: #eef1f5;
+  --color-border: rgba(0,0,0,0.06);
+  
+  --shadow-card: 0 4px 20px rgba(0,0,0,0.05);
+  --shadow-header: 0 1px 0 rgba(0,0,0,0.06);
+  
+  --ui-btn-radius: 30px;
+  --ui-border-radius: 20px;
 }
 
 .control-panel {
@@ -505,12 +470,14 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .control-panel.dark-mode {
-  --color-bg-main: #1e1e1e;
-  --color-text-main: #ffffff;
-  --color-text-sub: #e0e0e0;
-  --color-card-bg: #2c2c2c;
-  --color-bg-secondary: #333333;
-  --color-border: #444444;
+  --color-bg-main: #1c1c1e;
+  --color-text-main: #f5f5f7;
+  --color-text-sub: #86868b;
+  --color-card-bg: #2c2c2e;
+  --color-bg-secondary: #3a3a3c;
+  --color-border: rgba(255,255,255,0.1);
+  --shadow-card: 0 4px 20px rgba(0,0,0,0.3);
+  --shadow-header: 0 1px 0 rgba(255,255,255,0.1);
 }
 
 /* Header */
@@ -519,13 +486,26 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background: var(--color-bg-main);
+  background: var(--color-card-bg); /* Header is now white/card color */
   border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-header);
+  z-index: 10;
   cursor: move;
 }
+.header-title { display: flex; align-items: center; gap: 8px; }
 .header-title h3 { margin: 0; font-size: 16px; font-weight: 700; color: var(--color-text-main); }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; margin-left: 8px; }
-.status-dot.running { background: var(--color-success); box-shadow: 0 0 8px var(--color-success); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; transition: all 0.3s ease; }
+.status-dot.running { 
+  background: var(--color-success); 
+  box-shadow: 0 0 8px var(--color-success);
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(52, 199, 89, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); }
+}
 
 .header-controls { display: flex; gap: 8px; }
 .icon-btn { background: none; border: none; cursor: pointer; color: var(--color-text-sub); padding: 4px; border-radius: 50%; transition: background 0.2s; }
@@ -546,17 +526,33 @@ onUnmounted(() => {
 .tab-pane { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow-y: auto; }
 
 /* Stats & Cards */
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-.stat-card { background: var(--color-card-bg); padding: 10px; border-radius: 12px; text-align: center; border: 1px solid var(--color-border); }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat-card { 
+  background: var(--color-card-bg); 
+  padding: 12px; 
+  border-radius: 16px; 
+  text-align: center; 
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s;
+}
+.stat-card:hover { transform: translateY(-2px); }
 .stat-label { display: block; font-size: 10px; color: var(--color-text-sub); margin-bottom: 4px; }
 .stat-value { font-size: 16px; font-weight: 700; color: var(--color-text-main); }
 .stat-card.success .stat-value { color: var(--color-success); }
 .stat-card.danger .stat-value { color: var(--color-danger); }
 
-.card { background: var(--color-card-bg); border-radius: 16px; padding: 16px; margin-bottom: 16px; border: 1px solid var(--color-border); }
+.card { 
+  background: var(--color-card-bg); 
+  border-radius: 20px; 
+  padding: 20px; 
+  margin-bottom: 20px; 
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+}
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .card-header h4 { margin: 0; font-size: 14px; color: var(--color-text-main); }
-.audit-result-badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; background: #eee; }
+.audit-result-badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; background: #eee; color: #000 !important; }
 
 .product-info-row { display: flex; gap: 12px; margin-bottom: 12px; }
 .product-image-wrapper { width: 60px; height: 60px; border-radius: 8px; overflow: hidden; background: #fff; flex-shrink: 0; }
@@ -617,7 +613,8 @@ onUnmounted(() => {
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
   transition: transform 0.2s;
   animation: card-breathe 4s ease-in-out infinite; /* Breathing effect */
 }

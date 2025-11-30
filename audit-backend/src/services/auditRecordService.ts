@@ -116,6 +116,11 @@ class AuditRecordService {
       params.push(filters.keyword);
     }
 
+    if (filters.username) {
+      whereClauses.push('username LIKE ?');
+      params.push(`%${filters.username}%`);
+    }
+
     const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
     // 查询总数
@@ -125,6 +130,7 @@ class AuditRecordService {
       params
     );
     const total = countResult[0].total;
+    console.log(`[AuditRecordService] findAll query: ${JSON.stringify(filters)}, Total found: ${total}`);
 
     // 计算分页
     const totalPages = Math.ceil(total / pagination.limit);
@@ -229,6 +235,23 @@ class AuditRecordService {
       byReason[row.rejection_reason] = row.count;
     });
 
+    // 按审核员分组（使用 COUNT 和 GROUP BY）
+    const byAuditorSql = `
+      SELECT username, COUNT(*) as count 
+      FROM audit_records 
+      ${whereClause}
+      GROUP BY username
+      ORDER BY count DESC
+    `;
+    const byAuditorResult = await databaseManager.query<
+      (RowDataPacket & { username: string; count: number })[]
+    >(byAuditorSql, params);
+    const byAuditor: Record<string, number> = {};
+    byAuditorResult.forEach(row => {
+      const name = row.username || 'Unknown';
+      byAuditor[name] = row.count;
+    });
+
     // 时间趋势（按日期分组，使用 COUNT 和 GROUP BY）
     const trendSql = `
       SELECT DATE(submit_time) as date, COUNT(*) as count 
@@ -249,6 +272,7 @@ class AuditRecordService {
       totalFailures,
       byStage,
       byReason,
+      byAuditor,
       trend,
       avgProcessingTime: Math.round(avgProcessingTime),
     };

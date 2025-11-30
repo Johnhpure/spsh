@@ -47,6 +47,17 @@
 
           <el-col :xs="24" :sm="12" :md="6">
             <div class="filter-item">
+              <label class="filter-label">审核员</label>
+              <el-input
+                v-model="filters.username"
+                placeholder="请输入审核员姓名"
+                clearable
+              />
+            </div>
+          </el-col>
+
+          <el-col :xs="24" :sm="12" :md="6">
+            <div class="filter-item">
               <label class="filter-label">关键词搜索</label>
               <el-input
                 v-model="filters.keyword"
@@ -97,7 +108,8 @@ const emit = defineEmits<Emits>();
 const filters = ref<QueryFilters>({
   productId: props.initialFilters?.productId || '',
   stage: props.initialFilters?.stage || undefined,
-  keyword: props.initialFilters?.keyword || ''
+  keyword: props.initialFilters?.keyword || '',
+  username: props.initialFilters?.username || ''
 });
 
 const dateRange = ref<[string, string] | null>(
@@ -133,6 +145,10 @@ const handleApply = () => {
   if (filters.value.keyword?.trim()) {
     cleanedFilters.keyword = filters.value.keyword.trim();
   }
+
+  if (filters.value.username?.trim()) {
+    cleanedFilters.username = filters.value.username.trim();
+  }
   
   if (filters.value.startDate) {
     cleanedFilters.startDate = filters.value.startDate;
@@ -150,7 +166,8 @@ const handleReset = () => {
   filters.value = {
     productId: '',
     stage: undefined,
-    keyword: ''
+    keyword: '',
+    username: ''
   };
   dateRange.value = null;
   emit('reset');
