@@ -190,6 +190,7 @@ const handleLogin = async () => {
 }
 
 .login-card {
+  position: relative; /* Ensure absolute children are relative to this */
   background: #ffffff;
   border-radius: 24px;
   padding: 40px;
