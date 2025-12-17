@@ -8,7 +8,8 @@ export default defineConfig({
         host_permissions: [
             'https://admin.pinhaopin.com/*',
             'https://*.aliyuncs.com/*',
-            'http://localhost:3000/*'
+            'http://localhost:3000/*',
+            'http://192.168.1.8:3000/*'
         ],
         name: "Product Audit Assistant",
         description: "Automates product audit on admin.pinhaopin.com",
