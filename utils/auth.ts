@@ -25,7 +25,7 @@ export async function verifyToken(): Promise<boolean> {
 
   try {
     const config = await storage.getItem<{ apiUrl: string }>('local:audit_api_config');
-    const apiUrl = config?.apiUrl || 'http://localhost:3000';
+    const apiUrl = config?.apiUrl || 'http://192.168.1.8:3000';
     
     const response = await fetch(`${apiUrl}/api/auth/verify`, {
       method: 'GET',

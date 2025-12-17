@@ -39,7 +39,7 @@ export interface ApiConfig {
 class AuditApiClient {
   private async getConfig(): Promise<ApiConfig> {
     const config = await storage.getItem<ApiConfig>('local:audit_api_config');
-    return config || { url: 'http://localhost:3000/api' };
+    return config || { url: 'http://192.168.1.8:3002/api' };
   }
 
   private async getAuthHeaders(): Promise<Record<string, string>> {

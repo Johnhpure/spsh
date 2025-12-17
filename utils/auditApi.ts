@@ -27,8 +27,8 @@ class AuditApiClient {
     try {
       const stored = await storage.getItem<{ apiUrl: string }>('local:audit_api_config');
       
-      // Fallback to environment variables if not in storage
-      const apiUrl = stored?.apiUrl || import.meta.env.VITE_API_URL;
+      // Fallback to environment variables if not in storage, then default URL
+      const apiUrl = stored?.apiUrl || import.meta.env.VITE_API_URL || 'http://192.168.1.8:3000';
       
       if (!apiUrl) {
         console.warn('[AuditAPI] API URL is missing');
