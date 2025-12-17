@@ -26,15 +26,15 @@ class AuditApiClient {
   private async getConfig(): Promise<ApiConfig | null> {
     try {
       const stored = await storage.getItem<{ apiUrl: string }>('local:audit_api_config');
-      
+
       // Fallback to environment variables if not in storage, then default URL
       const apiUrl = stored?.apiUrl || import.meta.env.VITE_API_URL || 'http://192.168.1.8:3000';
-      
+
       if (!apiUrl) {
         console.warn('[AuditAPI] API URL is missing');
         return null;
       }
-      
+
       return { apiUrl };
     } catch (error) {
       console.error('[AuditAPI] Failed to get config:', error);
@@ -44,7 +44,7 @@ class AuditApiClient {
 
   async createRecord(data: AuditRecordData, retryCount = 1): Promise<{ success: boolean; error?: string }> {
     const config = await this.getConfig();
-    
+
     if (!config) {
       console.warn('[AuditAPI] Skipping API call - configuration missing');
       return { success: false, error: 'API configuration missing' };
@@ -57,7 +57,7 @@ class AuditApiClient {
     }
 
     const endpoint = `${config.apiUrl}/api/audit-records`;
-    
+
     // Prepare the request body
     const requestBody = {
       productId: data.productId,
@@ -81,7 +81,7 @@ class AuditApiClient {
     for (let attempt = 0; attempt <= retryCount; attempt++) {
       try {
         console.log(`[AuditAPI] Sending record for product ${data.productId} (attempt ${attempt + 1}/${retryCount + 1})`);
-        
+
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
@@ -99,7 +99,7 @@ class AuditApiClient {
           const errorText = await response.text();
           lastError = `HTTP ${response.status}: ${errorText}`;
           console.error(`[AuditAPI] Failed to create record (attempt ${attempt + 1}):`, lastError);
-          
+
           // Don't retry on client errors (4xx)
           if (response.status >= 400 && response.status < 500) {
             break;
@@ -120,6 +120,59 @@ class AuditApiClient {
 
     console.error(`[AuditAPI] All attempts failed for product ${data.productId}:`, lastError);
     return { success: false, error: lastError };
+  }
+
+  async getShopScope(shopId: string): Promise<{ success: boolean; businessScope?: string; error?: string }> {
+    const config = await this.getConfig();
+    if (!config) return { success: false, error: 'Config missing' };
+
+    const token = await getAuthToken();
+    if (!token) return { success: false, error: 'Auth required' };
+
+    try {
+      const response = await fetch(`${config.apiUrl}/api/shops/${shopId}/scope`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data;
+      } else {
+        // If 404/not found relative behavior, usually pure null/false, but here we return error msg
+        return { success: false, error: response.statusText };
+      }
+    } catch (e) {
+      console.error('[AuditAPI] getShopScope failed', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  async saveShopScope(shopId: string, businessScope: string): Promise<{ success: boolean; error?: string }> {
+    const config = await this.getConfig();
+    if (!config) return { success: false, error: 'Config missing' };
+
+    const token = await getAuthToken();
+    if (!token) return { success: false, error: 'Auth required' };
+
+    try {
+      const response = await fetch(`${config.apiUrl}/api/shops/scope`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ shopId, businessScope })
+      });
+
+      if (response.ok) {
+        return { success: true };
+      } else {
+        return { success: false, error: response.statusText };
+      }
+    } catch (e) {
+      console.error('[AuditAPI] saveShopScope failed', e);
+      return { success: false, error: String(e) };
+    }
   }
 }
 
