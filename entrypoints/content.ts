@@ -84,6 +84,9 @@ function createUi(ctx: any) {
         }
       };
 
+      // 缓存店铺经营范围，避免重复OCR调用 (Map<shopId, businessScope>)
+      const shopScopeCache = new Map<string, string>();
+
       const log = (msg: string) => {
         logs.value.push('[' + new Date().toLocaleTimeString() + '] ' + msg);
         console.log('[Audit] ' + msg);
@@ -311,290 +314,331 @@ function createUi(ctx: any) {
                 if (!shopId) {
                   log(`ID ${id}: 缺少店铺ID信息，跳过经营范围审核`);
                 } else {
-                  // Fetch Shop Details
-                  try {
-                    const shopRes = await fetch(`https://admin.pinhaopin.com/gateway/mall/getAdminShopDetail?shopId=${shopId}`);
-                    const shopData = await shopRes.json();
-                    const licensePic = shopData.data?.licensePic;
-
-                    if (licensePic) {
-                      log(`ID ${id}: 获取到营业执照，开始OCR识别...`);
-                      auditState.scopeRequest = `License: ${licensePic}`;
-
-                      const ocrResult = await aliyunOcr.recognizeBusinessLicense(licensePic);
-                      auditState.scopeResponse = JSON.stringify(ocrResult, null, 2);
-
-                      if (ocrResult.success && ocrResult.businessScope) {
-                        log(`ID ${id}: OCR成功，开始AI分析...`);
-                        const aiResult = await deepseek.analyzeBusinessScope(categoryName, ocrResult.businessScope);
-                        auditState.aiAnalysis = JSON.stringify(aiResult, null, 2);
-
-                        if (!aiResult.success) {
-                          isRejected = true;
-                          auditStage = 'business_scope';
-                          rejectReason = `经营范围不符: ${aiResult.reason}`;
-                          auditState.result = { label: `拒绝 (${rejectReason})`, type: 'danger' };
-                          log(`ID ${id}: 经营范围不符 (${aiResult.reason}) -> 拒绝`);
-                        }
-                      } else {
-                        log(`ID ${id}: 营业执照识别失败: ${ocrResult.error}`);
-                        auditState.result = { label: '需人工审核 (OCR失败)', type: 'warning' };
-                        stopAudit();
-                        return; // Stop processing this item
-                      }
-                    } else {
-                      log(`ID ${id}: 未找到店铺营业执照`);
-                    }
-                  } catch (e) {
-                    log(`ID ${id}: 获取店铺详情失败: ${e}`);
-                  }
-                }
-              }
-
-              if (isRejected) {
-                auditState.stats.rejected++;
-                history.unshift({
-                  id: String(id),
-                  name: name,
-                  image: mainImage,
-                  status: 'rejected',
-                  reason: rejectReason,
-                  timestamp: Date.now()
-                });
-                saveHistory();
-
-                // Send audit record to backend API
-                const auditEndTime = Date.now();
-                const aiProcessingTime = auditEndTime - auditStartTime;
-
-                try {
-                  log(`ID ${id}: 正在发送审核记录到后端...`);
-                  const apiResult = await auditApi.createRecord({
-                    productId: String(id),
-                    productTitle: name,
-                    productImage: mainImage || '',
-                    submitTime: new Date(),
-                    aiProcessingTime: aiProcessingTime,
-                    rejectionReason: rejectReason,
-                    auditStage: auditStage,
-                    apiError: apiError,
-                    textRequest: auditState.textRequest,
-                    textResponse: auditState.textResponse,
-                    imageRequest: auditState.imageRequest,
-                    imageResponse: auditState.imageResponse,
-                    scopeRequest: auditState.scopeRequest,
-                    scopeResponse: auditState.scopeResponse
-                  });
-
-                  if (apiResult.success) {
-                    log(`ID ${id}: 审核记录已成功发送到后端`);
+                  if (!shopId) {
+                    log(`ID ${id}: 缺少店铺ID信息，跳过经营范围审核`);
                   } else {
-                    log(`ID ${id}: 发送审核记录失败: ${apiResult.error}`);
+                    // 尝试从缓存或后端获取经营范围
+                    let businessScope = shopScopeCache.get(String(shopId));
+
+                    if (businessScope) {
+                      log(`ID ${id}: 命中本地店铺经营范围缓存 (ShopID: ${shopId})`);
+                      auditState.scopeRequest = `[Local Cached] ShopID: ${shopId}`;
+                      auditState.scopeResponse = `[Local Scope] ${businessScope.substring(0, 50)}...`;
+                    } else {
+                      // Try to get from Backend API
+                      try {
+                        const serverCache = await auditApi.getShopScope(String(shopId));
+                        if (serverCache.success && serverCache.businessScope) {
+                          businessScope = serverCache.businessScope;
+                          shopScopeCache.set(String(shopId), businessScope); // Update local cache
+                          log(`ID ${id}: 命中服务端店铺经营范围缓存 (ShopID: ${shopId})`);
+                          auditState.scopeRequest = `[Server Cached] ShopID: ${shopId}`;
+                          auditState.scopeResponse = `[Server Scope] ${businessScope.substring(0, 50)}...`;
+                        }
+                      } catch (e) {
+                        console.error('Failed to get shop scope from server', e);
+                      }
+                    }
+
+                    if (!businessScope) {
+                      // 缓存未命中，执行 API + OCR 流程
+                      try {
+                        const shopRes = await fetch(`https://admin.pinhaopin.com/gateway/mall/getAdminShopDetail?shopId=${shopId}`);
+                        const shopData = await shopRes.json();
+                        const licensePic = shopData.data?.licensePic;
+
+                        if (licensePic) {
+                          log(`ID ${id}: 获取到营业执照，开始OCR识别...`);
+                          auditState.scopeRequest = `License: ${licensePic}`;
+
+                          const ocrResult = await aliyunOcr.recognizeBusinessLicense(licensePic);
+                          auditState.scopeResponse = JSON.stringify(ocrResult, null, 2);
+
+                          if (ocrResult.success && ocrResult.businessScope) {
+                            businessScope = ocrResult.businessScope;
+                            shopScopeCache.set(String(shopId), businessScope); // 写入本地缓存
+
+                            // 异步写入服务端缓存
+                            auditApi.saveShopScope(String(shopId), businessScope).then(res => {
+                              if (res.success) log(`ID ${id}: 已将店铺经营范围同步至服务端`);
+                            });
+
+                            log(`ID ${id}: OCR成功，已缓存店铺范围`);
+                          } else {
+                            log(`ID ${id}: 营业执照识别失败: ${ocrResult.error}`);
+                            auditState.result = { label: '需人工审核 (OCR失败)', type: 'warning' };
+                            stopAudit();
+                            return; // Stop processing this item
+                          }
+                        } else {
+                          log(`ID ${id}: 未找到店铺营业执照`);
+                        }
+                      } catch (e) {
+                        log(`ID ${id}: 获取店铺详情失败: ${e}`);
+                      }
+                    }
+
+                    // 如果成功获取到经营范围（无论是缓存还是OCR），进行AI分析
+                    if (businessScope) {
+                      log(`ID ${id}: 开始AI资质分析...`);
+                      const aiResult = await deepseek.analyzeBusinessScope(categoryName, businessScope);
+                      auditState.aiAnalysis = JSON.stringify(aiResult, null, 2);
+
+                      if (!aiResult.success) {
+                        isRejected = true;
+                        auditStage = 'business_scope';
+                        rejectReason = `经营范围不符: ${aiResult.reason}`;
+                        auditState.result = { label: `拒绝 (${rejectReason})`, type: 'danger' };
+                        log(`ID ${id}: 经营范围不符 (${aiResult.reason}) -> 拒绝`);
+                      }
+                    }
                   }
-                } catch (error) {
-                  // Catch any unexpected errors and log them without stopping the audit process
-                  console.error(`[Audit] Failed to send record for ID ${id}:`, error);
-                  log(`ID ${id}: 发送审核记录时发生异常: ${error}`);
                 }
-              } else {
-                auditState.result = { label: '通过', type: 'success' };
-                auditState.stats.passed++;
-                log('ID ' + id + ': 结果 通过 (阿里云)');
 
-                history.unshift({
-                  id: String(id),
-                  name: name,
-                  image: mainImage,
-                  status: 'passed',
-                  timestamp: Date.now()
-                });
-                saveHistory();
+                if (isRejected) {
+                  auditState.stats.rejected++;
+                  history.unshift({
+                    id: String(id),
+                    name: name,
+                    image: mainImage,
+                    status: 'rejected',
+                    reason: rejectReason,
+                    timestamp: Date.now()
+                  });
+                  saveHistory();
 
-                await handleApprove(row, id);
+                  // Send audit record to backend API
+                  const auditEndTime = Date.now();
+                  const aiProcessingTime = auditEndTime - auditStartTime;
+
+                  try {
+                    log(`ID ${id}: 正在发送审核记录到后端...`);
+                    const apiResult = await auditApi.createRecord({
+                      productId: String(id),
+                      productTitle: name,
+                      productImage: mainImage || '',
+                      submitTime: new Date(),
+                      aiProcessingTime: aiProcessingTime,
+                      rejectionReason: rejectReason,
+                      auditStage: auditStage,
+                      apiError: apiError,
+                      textRequest: auditState.textRequest,
+                      textResponse: auditState.textResponse,
+                      imageRequest: auditState.imageRequest,
+                      imageResponse: auditState.imageResponse,
+                      scopeRequest: auditState.scopeRequest,
+                      scopeResponse: auditState.scopeResponse
+                    });
+
+                    if (apiResult.success) {
+                      log(`ID ${id}: 审核记录已成功发送到后端`);
+                    } else {
+                      log(`ID ${id}: 发送审核记录失败: ${apiResult.error}`);
+                    }
+                  } catch (error) {
+                    // Catch any unexpected errors and log them without stopping the audit process
+                    console.error(`[Audit] Failed to send record for ID ${id}:`, error);
+                    log(`ID ${id}: 发送审核记录时发生异常: ${error}`);
+                  }
+                } else {
+                  auditState.result = { label: '通过', type: 'success' };
+                  auditState.stats.passed++;
+                  log('ID ' + id + ': 结果 通过 (阿里云)');
+
+                  history.unshift({
+                    id: String(id),
+                    name: name,
+                    image: mainImage,
+                    status: 'passed',
+                    timestamp: Date.now()
+                  });
+                  saveHistory();
+
+                  await handleApprove(row, id);
+                }
+
+                processedCount++;
+                auditState.stats.processed++;
+
+                await new Promise(r => setTimeout(r, 1000)); // Wait 1s between items
               }
 
-              processedCount++;
-              auditState.stats.processed++;
+              if (processedCount === 0) {
+                log('本页未处理任何商品 (可能已处理或未找到DOM)。等待刷新...');
+                await new Promise(r => setTimeout(r, 5000));
+              }
+            }
+          } catch (e) {
+            log('错误: ' + e);
+            status.value = '错误';
+            isRunning.value = false;
+            localStorage.setItem('product_audit_running', 'false');
+          }
+        };
 
-              await new Promise(r => setTimeout(r, 1000)); // Wait 1s between items
+        // Helper functions for actions
+        const handleApprove = async (row: Element, id: string) => {
+          const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
+          const approveBtn = Array.from(buttons).find(b => {
+            const text = b.textContent?.replace(/\s/g, '') || '';
+            return text.includes('通过') || text.includes('批准');
+          });
+
+          if (approveBtn) {
+            log('ID ' + id + ': 点击批准按钮');
+            (approveBtn as HTMLElement).click();
+
+            // Wait for modal to appear
+            let modalContent: Element | null = null;
+            for (let i = 0; i < 10; i++) {
+              await new Promise(r => setTimeout(r, 200));
+              modalContent = document.querySelector('.ant-modal-content');
+              if (modalContent) break;
             }
 
-            if (processedCount === 0) {
-              log('本页未处理任何商品 (可能已处理或未找到DOM)。等待刷新...');
-              await new Promise(r => setTimeout(r, 5000));
-            }
-          }
-        } catch (e) {
-          log('错误: ' + e);
-          status.value = '错误';
-          isRunning.value = false;
-          localStorage.setItem('product_audit_running', 'false');
-        }
-      };
+            if (modalContent) {
+              log('ID ' + id + ': 找到确认弹窗');
+              // Find confirm button inside modal footer
+              // The user provided HTML shows: <button type="button" class="ant-btn css-1v28nim ant-btn-primary ant-btn-color-primary ant-btn-variant-solid"><span>确认批准</span></button>
+              const footerBtns = modalContent.querySelectorAll('.ant-modal-footer button, .ant-modal-footer .ant-btn');
+              const confirmBtn = Array.from(footerBtns).find(b => {
+                const text = b.textContent?.replace(/\s/g, '') || '';
+                return text.includes('确认') || text.includes('批准') || b.classList.contains('ant-btn-primary');
+              });
 
-      // Helper functions for actions
-      const handleApprove = async (row: Element, id: string) => {
-        const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
-        const approveBtn = Array.from(buttons).find(b => {
-          const text = b.textContent?.replace(/\s/g, '') || '';
-          return text.includes('通过') || text.includes('批准');
-        });
-
-        if (approveBtn) {
-          log('ID ' + id + ': 点击批准按钮');
-          (approveBtn as HTMLElement).click();
-
-          // Wait for modal to appear
-          let modalContent: Element | null = null;
-          for (let i = 0; i < 10; i++) {
-            await new Promise(r => setTimeout(r, 200));
-            modalContent = document.querySelector('.ant-modal-content');
-            if (modalContent) break;
-          }
-
-          if (modalContent) {
-            log('ID ' + id + ': 找到确认弹窗');
-            // Find confirm button inside modal footer
-            // The user provided HTML shows: <button type="button" class="ant-btn css-1v28nim ant-btn-primary ant-btn-color-primary ant-btn-variant-solid"><span>确认批准</span></button>
-            const footerBtns = modalContent.querySelectorAll('.ant-modal-footer button, .ant-modal-footer .ant-btn');
-            const confirmBtn = Array.from(footerBtns).find(b => {
-              const text = b.textContent?.replace(/\s/g, '') || '';
-              return text.includes('确认') || text.includes('批准') || b.classList.contains('ant-btn-primary');
-            });
-
-            if (confirmBtn) {
-              log('ID ' + id + ': 点击弹窗确认按钮');
-              (confirmBtn as HTMLElement).click();
+              if (confirmBtn) {
+                log('ID ' + id + ': 点击弹窗确认按钮');
+                (confirmBtn as HTMLElement).click();
+              } else {
+                log('ID ' + id + ': 未在弹窗中找到确认按钮');
+              }
             } else {
-              log('ID ' + id + ': 未在弹窗中找到确认按钮');
+              // Fallback for old behavior or if modal doesn't appear
+              log('ID ' + id + ': 未检测到弹窗，尝试查找通用确认按钮');
+              const confirmBtn = document.querySelector(
+                '.el-message-box__btns .el-button--primary, .ant-modal-confirm-btns .ant-btn-primary'
+              );
+              if (confirmBtn) {
+                (confirmBtn as HTMLElement).click();
+              }
             }
           } else {
-            // Fallback for old behavior or if modal doesn't appear
-            log('ID ' + id + ': 未检测到弹窗，尝试查找通用确认按钮');
+            log('ID ' + id + ': 未找到批准按钮');
+          }
+        };
+
+        const handleReject = async (row: Element, id: string) => {
+          const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
+          const rejectBtn = Array.from(buttons).find(b => {
+            const text = b.textContent?.replace(/\s/g, '') || '';
+            return text.includes('拒绝') || text.includes('驳回');
+          });
+
+          if (rejectBtn) {
+            log('ID ' + id + ': 点击拒绝按钮');
+            (rejectBtn as HTMLElement).click();
+
+            // Wait for dialog and find textarea with retries
+            let reasonInput: HTMLTextAreaElement | null = null;
+            for (let i = 0; i < 5; i++) {
+              await new Promise(r => setTimeout(r, 500));
+              reasonInput = document.querySelector('.el-textarea__inner, textarea, .ant-input') as HTMLTextAreaElement;
+              if (reasonInput && reasonInput.offsetParent !== null) break; // Ensure it's visible
+            }
+
+            if (reasonInput) {
+              log('ID ' + id + ': 找到拒绝原因输入框');
+
+              // Robust React 16+ hack
+              const proto = Object.getPrototypeOf(reasonInput);
+              const valueProp = Object.getOwnPropertyDescriptor(proto, "value") || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value") || Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
+
+              if (valueProp && valueProp.set) {
+                valueProp.set.call(reasonInput, '商品内容违规');
+              } else {
+                reasonInput.value = '商品内容违规';
+              }
+
+              reasonInput.dispatchEvent(new Event('input', { bubbles: true }));
+              reasonInput.dispatchEvent(new Event('change', { bubbles: true }));
+              reasonInput.dispatchEvent(new Event('blur', { bubbles: true }));
+            } else {
+              log('ID ' + id + ': 未找到拒绝原因输入框');
+            }
+
             const confirmBtn = document.querySelector(
-              '.el-message-box__btns .el-button--primary, .ant-modal-confirm-btns .ant-btn-primary'
+              '.el-dialog__footer .el-button--primary, .el-message-box__btns .el-button--primary, .ant-modal-footer .ant-btn-primary'
             );
             if (confirmBtn) {
               (confirmBtn as HTMLElement).click();
+            } else {
+              log('ID ' + id + ': 未找到确认按钮');
             }
+          } else {
+            log('ID ' + id + ': 未找到拒绝按钮');
           }
-        } else {
-          log('ID ' + id + ': 未找到批准按钮');
-        }
-      };
+        };
 
-      const handleReject = async (row: Element, id: string) => {
-        const buttons = row.querySelectorAll('button, .el-button, .ant-btn');
-        const rejectBtn = Array.from(buttons).find(b => {
-          const text = b.textContent?.replace(/\s/g, '') || '';
-          return text.includes('拒绝') || text.includes('驳回');
+        // 先检查登录状态，然后再创建应用
+        const authenticated = await isAuthenticated();
+        const showLogin = ref(!authenticated);
+
+        const handleLoginSuccess = () => {
+          showLogin.value = false;
+          log('登录成功！');
+        };
+
+        const handleLogout = async () => {
+          await logout();
+          showLogin.value = true;
+          stopAudit();
+          log('已退出登录');
+        };
+
+        const forceShowLogin = () => {
+          showLogin.value = true;
+          stopAudit();
+        };
+
+        const app = createApp({
+          setup() {
+            return () => {
+              if (showLogin.value) {
+                return h(LoginPanel, {
+                  onLoginSuccess: handleLoginSuccess
+                });
+              }
+              return h(ControlPanel, {
+                status: status.value,
+                isRunning: isRunning.value,
+                logs: logs.value,
+                auditState: auditState,
+                history: history,
+                onStart: startAudit,
+                onStop: stopAudit,
+                onLogout: handleLogout,
+                onAuthError: forceShowLogin
+              });
+            };
+          }
         });
 
-        if (rejectBtn) {
-          log('ID ' + id + ': 点击拒绝按钮');
-          (rejectBtn as HTMLElement).click();
+        app.mount(container);
 
-          // Wait for dialog and find textarea with retries
-          let reasonInput: HTMLTextAreaElement | null = null;
-          for (let i = 0; i < 5; i++) {
-            await new Promise(r => setTimeout(r, 500));
-            reasonInput = document.querySelector('.el-textarea__inner, textarea, .ant-input') as HTMLTextAreaElement;
-            if (reasonInput && reasonInput.offsetParent !== null) break; // Ensure it's visible
-          }
-
-          if (reasonInput) {
-            log('ID ' + id + ': 找到拒绝原因输入框');
-
-            // Robust React 16+ hack
-            const proto = Object.getPrototypeOf(reasonInput);
-            const valueProp = Object.getOwnPropertyDescriptor(proto, "value") || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value") || Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
-
-            if (valueProp && valueProp.set) {
-              valueProp.set.call(reasonInput, '商品内容违规');
-            } else {
-              reasonInput.value = '商品内容违规';
-            }
-
-            reasonInput.dispatchEvent(new Event('input', { bubbles: true }));
-            reasonInput.dispatchEvent(new Event('change', { bubbles: true }));
-            reasonInput.dispatchEvent(new Event('blur', { bubbles: true }));
-          } else {
-            log('ID ' + id + ': 未找到拒绝原因输入框');
-          }
-
-          const confirmBtn = document.querySelector(
-            '.el-dialog__footer .el-button--primary, .el-message-box__btns .el-button--primary, .ant-modal-footer .ant-btn-primary'
-          );
-          if (confirmBtn) {
-            (confirmBtn as HTMLElement).click();
-          } else {
-            log('ID ' + id + ': 未找到确认按钮');
+        // Log initial state
+        if (authenticated) {
+          log('已登录，欢迎使用审核功能');
+          // Auto-start if previously running
+          if (localStorage.getItem('product_audit_running') === 'true') {
+            startAudit();
           }
         } else {
-          log('ID ' + id + ': 未找到拒绝按钮');
+          log('请先登录以使用审核功能');
         }
-      };
 
-      // 先检查登录状态，然后再创建应用
-      const authenticated = await isAuthenticated();
-      const showLogin = ref(!authenticated);
-
-      const handleLoginSuccess = () => {
-        showLogin.value = false;
-        log('登录成功！');
-      };
-
-      const handleLogout = async () => {
-        await logout();
-        showLogin.value = true;
-        stopAudit();
-        log('已退出登录');
-      };
-
-      const forceShowLogin = () => {
-        showLogin.value = true;
-        stopAudit();
-      };
-
-      const app = createApp({
-        setup() {
-          return () => {
-            if (showLogin.value) {
-              return h(LoginPanel, {
-                onLoginSuccess: handleLoginSuccess
-              });
-            }
-            return h(ControlPanel, {
-              status: status.value,
-              isRunning: isRunning.value,
-              logs: logs.value,
-              auditState: auditState,
-              history: history,
-              onStart: startAudit,
-              onStop: stopAudit,
-              onLogout: handleLogout,
-              onAuthError: forceShowLogin
-            });
-          };
-        }
-      });
-
-      app.mount(container);
-
-      // Log initial state
-      if (authenticated) {
-        log('已登录，欢迎使用审核功能');
-        // Auto-start if previously running
-        if (localStorage.getItem('product_audit_running') === 'true') {
-          startAudit();
-        }
-      } else {
-        log('请先登录以使用审核功能');
-      }
-
-      return app;
-    },
-    onRemove: (app: any) => {
+        return app;
+      },
+        onRemove: (app: any) => {
       app.unmount();
     },
   });

@@ -212,6 +212,31 @@ class AuditApiClient {
       return { success: false, error: String(error) };
     }
   }
+
+  async getShopScope(shopId: string): Promise<{ success: boolean; businessScope?: string; error?: string }> {
+    try {
+      const result = await this.request(`/shops/${shopId}/scope`, {
+        method: 'GET'
+      });
+      return result;
+    } catch (error) {
+      // Don't log error for 404/not found as it's expected
+      return { success: false, error: String(error) };
+    }
+  }
+
+  async saveShopScope(shopId: string, businessScope: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const result = await this.request('/shops/scope', {
+        method: 'POST',
+        body: JSON.stringify({ shopId, businessScope })
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[AuditAPI] Failed to save shop scope:', error);
+      return { success: false, error: String(error) };
+    }
+  }
 }
 
 export const auditRecordAPI = new AuditApiClient();

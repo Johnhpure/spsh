@@ -13,6 +13,7 @@ import usersRouter from './routes/users';
 import proxyRouter from './routes/proxy';
 import systemSettingsRouter from './routes/systemSettings';
 import manualAuditRouter from './routes/manualAuditRoutes';
+import shopsRouter from './routes/shops';
 
 // 根据环境加载对应的配置文件
 const env = process.env.NODE_ENV || 'development';
@@ -84,6 +85,7 @@ app.use('/api/proxy', proxyRouter);
 app.use('/api/audit-records', auditRecordsRouter);
 app.use('/api/settings', systemSettingsRouter);
 app.use('/api/manual-audit', manualAuditRouter);
+app.use('/api/shops', shopsRouter);
 
 // 注册错误处理中间件（必须在所有路由之后）
 app.use(errorHandler);

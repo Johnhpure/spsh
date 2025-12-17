@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import axios from 'axios';
-import jwt from 'jsonwebtoken';
 import { auditRecordService } from '../services/auditRecordService';
 
 const router = Router();
@@ -64,7 +63,8 @@ router.post('/pinhaopin/auditProduct', async (req, res) => {
         const cookie = req.headers['x-pinhaopin-cookie'];
 
         if (!cookie) {
-            return res.status(401).json({ error: 'No external cookie provided' });
+            res.status(401).json({ error: 'No external cookie provided' });
+            return;
         }
 
         const response = await axios.post('https://admin.pinhaopin.com/gateway/mall/auditProduct', {
@@ -102,7 +102,8 @@ router.post('/pinhaopin/batchAuditProduct', async (req, res) => {
         const cookie = req.headers['x-pinhaopin-cookie'];
 
         if (!cookie) {
-            return res.status(401).json({ error: 'No external cookie provided' });
+            res.status(401).json({ error: 'No external cookie provided' });
+            return;
         }
 
         const response = await axios.post('https://admin.pinhaopin.com/gateway/mall/batchAuditProduct', {

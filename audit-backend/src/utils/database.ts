@@ -212,12 +212,22 @@ class DatabaseManager {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `;
 
+    const createShopProfilesTableSQL = `
+      CREATE TABLE IF NOT EXISTS shop_profiles (
+        shop_id VARCHAR(50) PRIMARY KEY,
+        business_scope TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `;
+
     try {
       logger.info('Initializing database tables...');
 
       // Create tables
       await this.query(createUsersTableSQL);
       await this.query(createAuditRecordsTableSQL);
+      await this.query(createShopProfilesTableSQL);
 
       // Check if audit_records needs column updates (for existing installations)
       try {
